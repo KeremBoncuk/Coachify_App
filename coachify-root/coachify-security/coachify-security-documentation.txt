@@ -1,0 +1,36 @@
+Coachify Security Module – Quick Reference
+- This module provides centralized JWT authentication, token validation, and user role-based registration/login/logout.
+- There are two classes that is open to be imported:
+    - import io.coachify.security.service.AuthManager;
+    - import io.coachify.security.jwt.JwtService;
+
+
+Package: io.coachify.security.service  -->  Handles registration, login, and logout for Admins, Coaches, and Students.
+
+  - registerAdmin(User admin): String --> Registers an Admin user, auto-logs in, and returns a JWT token.
+  - loginAdmin(String email, String rawPassword): String --> Logs in an Admin using email and password, returns a JWT token.
+  - logoutAdmin(ObjectId adminId): void --> Invalidates Admin’s active token(s) via JwtService.
+  - registerCoach(Coach coach): String --> Registers a Coach (with role COACH), auto-logs in, returns a JWT token.
+  - loginCoach(String email, String rawPassword): String --> Logs in a Coach, returns a JWT token.
+  - logoutCoach(ObjectId coachId): void --> Invalidates Coach’s token(s).
+  - registerStudent(Student student): String --> Registers a Student (with role STUDENT), auto-logs in, returns a JWT token.
+  - loginStudent(String email, String rawPassword): String --> Logs in a Student, returns a JWT token.
+  - logoutStudent(ObjectId studentId): void --> Invalidates Student’s token(s).
+
+
+Package: io.coachify.security.jwt --> Handles JWT creation, validation, and extraction.
+
+  - generateToken(ObjectId userId, UserRole role): String --> Generates a signed JWT token, includes tokenId and role. Invalidates previous tokens.
+  - validateToken(String token): boolean --> Validates signature, expiration, and active tokenId in DB.
+  - getUserId(String token): ObjectId --> Extracts user ID (subject) from the token.
+  - getUserRole(String token): UserRole --> Extracts role from the token.
+  - getTokenId(String token): String --> Extracts tokenId claim.
+  - getExpiration(String token): Instant --> Extracts expiration date as an Instant.
+  - invalidateToken(ObjectId userId): void --> Deletes all active tokens for a given user (used for logout).
+
+
+## Notes
+
+- JWT expiration is 1 day by default.
+- Tokens are stored in MongoDB (`active_tokens` collection).
+- Passwords must be encoded via PasswordEncoder.
