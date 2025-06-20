@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: coachify-backend
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/coachifydb
+
+minio:
+  url: http://localhost:9000
+  access-key: keremboncuk
+  secret-key: abc3256ABC3256
+  bucket: coachify-media
+
+jwt.secret: 3Y7+F4VxUgPQpPjvcnNCM0QpZqozJfsGbA8v9LtIc5o=
+
