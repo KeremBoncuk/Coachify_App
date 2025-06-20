@@ -11,5 +11,5 @@ minio:
   secret-key: abc3256ABC3256
   bucket: coachify-media
 
-jwt.secret: 3Y7+F4VxUgPQpPjvcnNCM0QpZqozJfsGbA8v9LtIc5o=
+jwt.secret: 3Y7+F4VxUgPQpPjvcnNCM0QpZqozJfsGbA8v9LtIc5o= #this will be hid once deployed
 
