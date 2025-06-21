@@ -6,14 +6,14 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public interface ActiveTokenRepository extends MongoRepository<ActiveToken, ObjectId> {
+public interface ActiveTokenRepository extends MongoRepository<ActiveToken, String> {
 
-  // 🗑️ Delete all active tokens by userId
+  /** Used by JwtService when issuing a new token */
   void deleteByUserId(ObjectId userId);
 
-  // ✅ Check if a token with the given tokenId exists
-  boolean existsByTokenId(String tokenId);
+  /** Used by AuthService.logout() */
+  void deleteByUserIdAndTokenId(ObjectId userId, String tokenId);
 
-  // (Optional) For logout: delete token by tokenId
-  void deleteByTokenId(String tokenId);
+  /** Used by JwtService.isTokenValid() */
+  boolean existsByTokenId(String tokenId);
 }

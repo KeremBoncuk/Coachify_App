@@ -2,6 +2,7 @@ package io.coachify.security;
 
 import io.coachify.entity.jwt.ActiveToken;
 import io.coachify.entity.jwt.UserRole;
+import io.coachify.exception.JwtAuthenticationException;
 import io.coachify.repo.ActiveTokenRepository;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;

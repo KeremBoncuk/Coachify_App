@@ -1,6 +1,7 @@
 package io.coachify.security;
 
 import io.coachify.entity.jwt.UserRole;
+import io.coachify.exception.JwtAuthenticationException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

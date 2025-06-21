@@ -1,4 +1,4 @@
-package io.coachify.security;
+package io.coachify.exception;
 
 public class JwtAuthenticationException extends RuntimeException {
   public JwtAuthenticationException(String message) {
