@@ -25,8 +25,6 @@ public class Main implements CommandLineRunner {
     if (adminRepository.count() == 0) {
       Admin devAdmin = new Admin();
       devAdmin.setId(new ObjectId());
-      devAdmin.setName("Dev");
-      devAdmin.setSurname("Admin");
       devAdmin.setFullName("Dev Admin");
       devAdmin.setEmail("N/A"); // Encrypted fields skipped
       devAdmin.setPhoneNumber("N/A");

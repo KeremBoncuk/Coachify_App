@@ -24,5 +24,6 @@ public class ChatMessage {
   private List<String> mediaUrls;
 
   private SeenStatus seenStatus;
+  private Instant seenAt;
   private Instant sentAt;
 }

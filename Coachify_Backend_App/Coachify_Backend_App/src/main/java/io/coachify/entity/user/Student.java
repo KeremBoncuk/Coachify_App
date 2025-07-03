@@ -17,9 +17,6 @@ public class Student {
   @Id
   private ObjectId id;
 
-  private String name;
-  private String surname;
-
   @Indexed(unique = true)
   private String fullName;
 
@@ -38,6 +35,6 @@ public class Student {
 
   private List<MentorChangeRecord> mentorChangeHistory;
 
-  private boolean isActive;
+  private boolean active;
   private LocalDate abandonmentDate;
 }

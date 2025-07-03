@@ -14,9 +14,6 @@ public class Admin {
   @Id
   private ObjectId id;
 
-  private String name;
-  private String surname;
-
   @Indexed(unique = true)
   private String fullName;
 

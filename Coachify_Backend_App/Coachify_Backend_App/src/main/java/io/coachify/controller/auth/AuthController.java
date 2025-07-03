@@ -7,6 +7,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -18,15 +20,15 @@ public class AuthController {
    * Login endpoint
    * Example Request Body:
    * {
-   *   "fullName": "Kemal Inan",
-   *   "password": "123456",
-   *   "role": "MENTOR"
+   *   "fullName": "Dev Admin",
+   *   "password": "admin123",
+   *   "role": "ADMIN"
    * }
    */
   @PostMapping("/login")
-  public ResponseEntity<String> login(@RequestBody LoginRequest request) {
+  public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
     String jwt = authService.login(request);
-    return ResponseEntity.ok(jwt);
+    return ResponseEntity.ok(Map.of("token", jwt));  // Wrapped in JSON
   }
 
   /**
@@ -37,5 +39,15 @@ public class AuthController {
   public ResponseEntity<Void> logout() {
     authService.logout();
     return ResponseEntity.noContent().build();
+  }
+
+  /**
+   * JWT validation endpoint.
+   * Used by frontend to verify if the token is still valid & active in DB.
+   */
+  @GetMapping("/validate-token")
+  public ResponseEntity<Void> validateToken() {
+    // If this method is called, token is valid — JwtAuthenticationFilter already ran.
+    return ResponseEntity.ok().build();
   }
 }

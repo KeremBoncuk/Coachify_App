@@ -19,41 +19,41 @@ import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationFilter extends OncePerRequestFilter  {
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final JwtService jwtService;
 
   @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+  protected boolean shouldNotFilter(HttpServletRequest request) {
+    String path = request.getServletPath();
+    // ✅ Only skip JWT validation for login, not logout
+    return path.equals("/auth/login");
+  }
+
+  @Override
+  protected void doFilterInternal(HttpServletRequest request,
+                                  HttpServletResponse response,
+                                  FilterChain filterChain)
     throws ServletException, IOException {
+
     final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-      response.setContentType("application/json");
-      response.getWriter().write("""
-        {
-          "error": "JWT ERROR: Missing or invalid Authorization header",
-          "status": 401
+    try {
+      if (authHeader != null && authHeader.startsWith("Bearer ")) {
+        final String token = authHeader.substring(7);
+
+        if (jwtService.isTokenValid(token)) {
+          ObjectId userId = jwtService.extractUserId(token);
+          UserRole userRole = jwtService.extractUserRole(token);
+
+          CustomPrincipal principal = new CustomPrincipal(userId, userRole);
+
+          UsernamePasswordAuthenticationToken authentication =
+            new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
+
+          authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+          SecurityContextHolder.getContext().setAuthentication(authentication);
         }
-        """);
-      return;
-    }
-
-
-    final String token = authHeader.substring(7); //Removing the "Bearer " text
-
-    try{
-      if (jwtService.isTokenValid(token)) {
-        ObjectId userId = jwtService.extractUserId(token);
-        UserRole userRole = jwtService.extractUserRole(token);
-
-        CustomPrincipal principal = new CustomPrincipal(userId, userRole);
-
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities()); //Get authorities from role
-
-        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-        SecurityContextHolder.getContext().setAuthentication(authentication);
       }
 
     } catch (JwtAuthenticationException ex) {
@@ -61,7 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter  {
       response.setContentType("application/json");
       response.getWriter().write(String.format("""
         {
-          "error": "%s",
+          "error": "JWT ERROR: %s",
           "status": 401
         }
         """, ex.getMessage()));
@@ -69,9 +69,5 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter  {
     }
 
     filterChain.doFilter(request, response);
-
-
   }
-
-
 }

@@ -17,9 +17,6 @@ public class Mentor {
   @Id
   private ObjectId id;
 
-  private String name;
-  private String surname;
-
   @Indexed(unique = true)
   private String fullName;
 
@@ -38,6 +35,6 @@ public class Mentor {
 
   private List<ObjectId> assignedStudents;
 
-  private boolean isActive;
+  private boolean active;
   private LocalDate abandonmentDate;
 }
