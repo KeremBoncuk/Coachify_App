@@ -1,23 +1,13 @@
 import {
-  List,
-  Box,
-  Typography,
-  CircularProgress,
-  Paper,
+  List, Box, Typography, CircularProgress, Paper
 } from "@mui/material";
 import {
-  useEffect,
-  useState,
-  useMemo,
-  useRef,
-  useLayoutEffect,
+  useEffect, useState, useMemo, useRef, useLayoutEffect
 } from "react";
 import dayjs from "dayjs";
 import { formatTime } from "../../../utils/formatTime";
 import {
-  getMentorById,
-  getStudentById,
-  getAdminById,
+  getMentorById, getStudentById, getAdminById
 } from "../../../api/adminUsers";
 import { getUserIdFromToken } from "../../../auth/jwtUtils";
 import { CheckCircle, RadioButtonUnchecked } from "@mui/icons-material";
@@ -29,7 +19,7 @@ const Sup = ({ children }) => (
 
 const formatDateHeader = (iso) => {
   const d = dayjs(iso);
-  if (dayjs().isSame(d, "day"))           return "Today";
+  if (dayjs().isSame(d, "day"))                 return "Today";
   if (dayjs().subtract(1, "day").isSame(d,"day")) return "Yesterday";
   return d.format("DD MMM YYYY");
 };
@@ -215,7 +205,8 @@ const ChatMessageList = ({
                   <DateBubble key={`date-${ymd}`} label={formatDateHeader(m.sentAt)} />
                 );
               }
-              out.push(<MsgBubble key={m.messageId ?? m.id} m={m} />);
+              /* key uses new DTO field `id` */
+              out.push(<MsgBubble key={m.id} m={m} />);
             });
             return out;
           })()}

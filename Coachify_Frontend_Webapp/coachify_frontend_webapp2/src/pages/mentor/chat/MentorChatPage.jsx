@@ -1,48 +1,99 @@
 import {
-  Box,
-  Divider,
-  TextField,
-  Stack,
+  Box, Divider, TextField, Stack
 } from "@mui/material";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
-import ChatRoomList from "./ChatRoomList";
-import ChatMessageList from "./ChatMessageList";
+import SockJS  from "sockjs-client";
+import { Client } from "@stomp/stompjs";
+
+import ChatRoomList     from "./ChatRoomList";
+import ChatMessageList  from "./ChatMessageList";
 import ChatMessageInput from "./ChatMessageInput";
 
 import {
   getActiveChatRooms,
-  getPaginatedMessages,
-  sendMessage,
-  markMessagesAsSeen,
+  getPaginatedMessages
 } from "../../../api/mentorChat";
 import { getStudentById } from "../../../api/adminUsers";
+import { getToken }       from "../../../auth/jwtUtils";
 
-const PAGE_SIZE = 20;
+const BACKEND   = process.env.REACT_APP_BACKEND_URL ?? "http://localhost:8080";
+const PAGE_SIZE  = 20;
+/* STOMP destinations */
+const SEND_DEST  = "/app/chat.send";
+const SEEN_DEST  = "/app/chat.seen";
+const TOPIC_BASE = "/topic/chat";          // + /{roomId}
 
 const MentorChatPage = () => {
-  /* rooms */
-  const [chatRooms, setChatRooms] = useState([]);
-  const [roomsLoading, setRoomsLoading] = useState(true);
-  const [selectedRoomId, setSelectedRoomId] = useState(null);
+  /* ───────── rooms ───────── */
+  const [chatRooms,     setChatRooms]     = useState([]);
+  const [roomsLoading,  setRoomsLoading]  = useState(true);
+  const [selectedRoomId,setSelectedRoomId]= useState(null);
 
-  /* messages */
-  const [messages, setMessages] = useState([]);
-  const [hasMore, setHasMore] = useState(false);
-  const [nextBefore, setNextBefore] = useState(null);
+  /* ───────── messages ───────── */
+  const [messages, setMessages]            = useState([]);
+  const [hasMore,  setHasMore]             = useState(false);
+  const [nextBefore,setNextBefore]         = useState(null);
   const [messagesLoading, setMessagesLoading] = useState(false);
-  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [loadingOlder,    setLoadingOlder]    = useState(false);
 
-  /* search */
+  /* ───────── search ───────── */
   const [searchTerm, setSearchTerm] = useState("");
 
-  /* ───── rooms fetch + name enrichment ───── */
+  /* ───────── STOMP client ───────── */
+  const stompRef   = useRef(null);
+  const roomSubRef = useRef(null);
+  const seenSubRef = useRef(null);
+
+  /* connect once */
+  useEffect(() => {
+    const client = new Client({
+      webSocketFactory: () => new SockJS(`${BACKEND}/ws`),
+      connectHeaders  : { Authorization: `Bearer ${getToken()}` },
+      reconnectDelay  : 5000,
+    });
+    client.activate();
+    stompRef.current = client;
+    return () => client.deactivate();
+  }, []);
+
+  /* (re)subscribe when room changes */
+  useEffect(() => {
+    if (!stompRef.current || !stompRef.current.connected) return;
+    const client = stompRef.current;
+
+    roomSubRef.current?.unsubscribe();
+    seenSubRef.current?.unsubscribe();
+
+    if (!selectedRoomId) return;
+
+    roomSubRef.current = client.subscribe(
+      `${TOPIC_BASE}/${selectedRoomId}`,
+      (msg) => {
+        const m = JSON.parse(msg.body);
+        setMessages((prev) => [...prev, m]);
+        client.publish({
+          destination: SEEN_DEST,
+          body: JSON.stringify({
+            chatRoomId: selectedRoomId,
+            seenUntil : new Date().toISOString(),
+          }),
+        });
+      }
+    );
+
+    seenSubRef.current = client.subscribe(
+      `${TOPIC_BASE}/${selectedRoomId}/seen`,
+      () => {}
+    );
+  }, [selectedRoomId]);
+
+  /* ───────── rooms fetch ───────── */
   const loadRooms = async () => {
     setRoomsLoading(true);
     try {
       const { data } = await getActiveChatRooms();
 
-      // fill in missing studentFullName
       const enriched = await Promise.all(
         data.map(async (r) => {
           if (r.studentFullName) return r;
@@ -61,53 +112,50 @@ const MentorChatPage = () => {
     }
   };
 
-  /* ───── page fetch ───── */
+  /* ───────── history fetch ───────── */
   const fetchPage = async (roomId, before = null) => {
     const { data } = await getPaginatedMessages(roomId, before, PAGE_SIZE);
     return {
-      msgs: data.messages.slice().reverse(),
-      hasMore: data.hasMore,
+      msgs      : data.messages.slice().reverse(),
+      hasMore   : data.hasMore,
       nextBefore: data.nextBefore,
     };
   };
 
-  const loadInitialMessages = useCallback(
-    async (roomId) => {
-      if (!roomId) {
-        setMessages([]);
-        setHasMore(false);
-        setNextBefore(null);
-        return;
-      }
-      setMessagesLoading(true);
-      try {
-        const { msgs, hasMore, nextBefore } = await fetchPage(roomId);
-        setMessages(msgs);
-        setHasMore(hasMore);
-        setNextBefore(nextBefore);
+  const loadInitialMessages = useCallback(async (roomId) => {
+    if (!roomId) {
+      setMessages([]);
+      setHasMore(false);
+      setNextBefore(null);
+      return;
+    }
+    setMessagesLoading(true);
+    try {
+      const { msgs, hasMore, nextBefore } = await fetchPage(roomId);
+      setMessages(msgs);
+      setHasMore(hasMore);
+      setNextBefore(nextBefore);
 
-        await markMessagesAsSeen(roomId, new Date().toISOString());
-      } finally {
-        setMessagesLoading(false);
-      }
-    },
-    []
-  );
+      stompRef.current?.publish({
+        destination: SEEN_DEST,
+        body: JSON.stringify({
+          chatRoomId: roomId,
+          seenUntil : new Date().toISOString(),
+        }),
+      });
+    } finally {
+      setMessagesLoading(false);
+    }
+  }, []);
 
-  /* prepend older */
   const loadOlder = async () => {
     if (!hasMore || loadingOlder || !selectedRoomId) return;
     setLoadingOlder(true);
     try {
       const { msgs, hasMore: hm, nextBefore: nb } = await fetchPage(
-        selectedRoomId,
-        nextBefore
+        selectedRoomId, nextBefore
       );
-      setMessages((prev) => {
-        const seen = new Set(prev.map((m) => m.id));
-        const unique = msgs.filter((m) => !seen.has(m.id));
-        return [...unique, ...prev];
-      });
+      setMessages((prev) => [...msgs, ...prev]);
       setHasMore(hm);
       setNextBefore(nb);
     } finally {
@@ -115,10 +163,17 @@ const MentorChatPage = () => {
     }
   };
 
-  const handleSend = async (text) => {
-    if (!selectedRoomId) return;
-    await sendMessage(selectedRoomId, text);
-    await loadInitialMessages(selectedRoomId);
+  /* send */
+  const handleSend = (text) => {
+    if (!selectedRoomId || !stompRef.current?.connected) return;
+    stompRef.current.publish({
+      destination: SEND_DEST,
+      body: JSON.stringify({
+        chatRoomId: selectedRoomId,
+        text,
+        mediaUrls: [],
+      }),
+    });
   };
 
   /* effects */
@@ -134,7 +189,7 @@ const MentorChatPage = () => {
   /* render */
   return (
     <Box display="flex" flex={1} sx={{ minHeight: 0 }}>
-      {/* rooms */}
+      {/* LEFT ─ Rooms */}
       <Box
         width={320}
         flexShrink={0}
@@ -162,7 +217,7 @@ const MentorChatPage = () => {
         </Box>
       </Box>
 
-      {/* messages */}
+      {/* RIGHT ─ Messages */}
       <Box display="flex" flexDirection="column" flex={1} sx={{ minHeight: 0 }}>
         <ChatMessageList
           messages={messages}

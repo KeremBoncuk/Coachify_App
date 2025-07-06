@@ -3,16 +3,18 @@ import { Send } from "@mui/icons-material";
 import { useState } from "react";
 
 /**
- * Props:
+ * Props
+ * -----
  *  • disabled : boolean
- *  • onSend(text) : Promise
+ *  • onSend   : (text: string) => void
  */
 const ChatMessageInput = ({ onSend, disabled }) => {
   const [value, setValue] = useState("");
 
-  const handleSend = async () => {
-    if (!value.trim()) return;
-    await onSend(value.trim());
+  const handleSend = () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onSend(trimmed);
     setValue("");
   };
 

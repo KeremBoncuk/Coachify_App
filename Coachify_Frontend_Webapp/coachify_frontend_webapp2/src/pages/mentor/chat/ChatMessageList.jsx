@@ -1,3 +1,4 @@
+// src/pages/mentor/chat/ChatMessageList.jsx
 import {
   List,
   Box,
@@ -23,21 +24,28 @@ import {
 } from "../../../api/adminUsers";
 import { getUserIdFromToken } from "../../../auth/jwtUtils";
 
+/* ───────────────────────── helpers ───────────────────────── */
 const Sup = ({ children }) => (
   <sup style={{ fontSize: "0.7em", verticalAlign: "super" }}>{children}</sup>
 );
 
 const formatDateHeader = (iso) => {
   const d = dayjs(iso);
-  if (dayjs().isSame(d, "day")) return "Today";
-  if (dayjs().subtract(1, "day").isSame(d, "day")) return "Yesterday";
+  if (dayjs().isSame(d, "day"))                 return "Today";
+  if (dayjs().subtract(1, "day").isSame(d,"day")) return "Yesterday";
   return d.format("DD MMM YYYY");
 };
 
 /**
- * Mentor Chat Message List (with universal seen indicator)
- * Props:
- *  • messages, loading, hasMore, loadingOlder, loadOlder
+ * Mentor Chat Message List
+ *
+ * Props
+ * -----
+ *  • messages      : array (oldest → newest)
+ *  • loading       : boolean
+ *  • hasMore       : boolean
+ *  • loadingOlder  : boolean
+ *  • loadOlder()   : function
  */
 const ChatMessageList = ({
   messages,
@@ -46,55 +54,57 @@ const ChatMessageList = ({
   loadingOlder,
   loadOlder,
 }) => {
+  /* id → fullName cache */
   const [nameMap, setNameMap] = useState({});
   const currentUserId = useMemo(() => getUserIdFromToken(), []);
 
+  /* refs for scroll handling */
   const containerRef = useRef(null);
-  const topSentinel = useRef(null);
-  const bottomRef = useRef(null);
+  const topSentinel  = useRef(null);
+  const bottomRef    = useRef(null);
 
-  /* fetch missing names */
+  /* ── fetch unknown names exactly once ── */
   useEffect(() => {
-    const need = {};
+    const missing = {};
     messages.forEach((m) => {
-      if (!nameMap[m.senderId]) need[m.senderId] = m.senderRole;
+      if (!nameMap[m.senderId]) missing[m.senderId] = m.senderRole;
     });
-    if (Object.keys(need).length === 0) return;
+    if (Object.keys(missing).length === 0) return;
 
     (async () => {
       try {
-        const tasks = Object.entries(need).map(([id, role]) => {
+        const tasks = Object.entries(missing).map(([id, role]) => {
           if (role === "MENTOR")  return getMentorById(id).then((d) => ({ id, name: d.fullName }));
           if (role === "STUDENT") return getStudentById(id).then((d) => ({ id, name: d.fullName }));
           return getAdminById(id).then((d) => ({ id, name: d.fullName }));
         });
-        const res = await Promise.all(tasks);
+        const resolved = await Promise.all(tasks);
         const add = {};
-        res.forEach(({ id, name }) => (add[id] = name));
+        resolved.forEach(({ id, name }) => (add[id] = name));
         setNameMap((prev) => ({ ...prev, ...add }));
-      } catch (e) {
-        console.error("Name lookup failed:", e);
+      } catch (err) {
+        console.error("Name lookup failed:", err);
       }
     })();
   }, [messages, nameMap]);
 
-  /* infinite-scroll ↑ */
+  /* ── infinite-scroll ↑ sentinel ── */
   useEffect(() => {
     if (!topSentinel.current) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => entry.isIntersecting && loadOlder(),
+    const io = new IntersectionObserver(
+      ([e]) => e.isIntersecting && loadOlder(),
       { root: containerRef.current, threshold: 0 }
     );
-    observer.observe(topSentinel.current);
-    return () => observer.disconnect();
+    io.observe(topSentinel.current);
+    return () => io.disconnect();
   }, [loadOlder]);
 
-  /* maintain scroll offset when prepending */
+  /* ── keep scroll offset when prepending ── */
   const prevHeight = useRef(0);
-  const prevLen = useRef(messages.length);
+  const prevLen    = useRef(messages.length);
   if (messages.length !== prevLen.current) {
     prevHeight.current = containerRef.current?.scrollHeight || 0;
-    prevLen.current = messages.length;
+    prevLen.current    = messages.length;
   }
   useLayoutEffect(() => {
     if (loadingOlder && containerRef.current) {
@@ -103,16 +113,19 @@ const ChatMessageList = ({
     }
   }, [loadingOlder]);
 
-  /* scroll to bottom on first load / send */
+  /* ── auto-scroll to bottom on initial load / send ── */
   useEffect(() => {
     if (!loading && bottomRef.current)
       bottomRef.current.scrollIntoView({ behavior: "auto" });
   }, [loading]);
 
-  /* helpers */
+  /* ───────────────────── sub-components ───────────────────── */
   const DateBubble = ({ label }) => (
-    <Box display="flex" justifyContent="center" mt={1} mb={1}>
-      <Paper elevation={0} sx={{ bgcolor: "grey.300", px: 1.5, py: 0.2, borderRadius: 2 }}>
+    <Box display="flex" justifyContent="center" my={1}>
+      <Paper
+        elevation={0}
+        sx={{ bgcolor: "grey.300", px: 1.5, py: 0.2, borderRadius: 2 }}
+      >
         <Typography variant="caption" color="text.secondary">
           {label}
         </Typography>
@@ -121,14 +134,11 @@ const ChatMessageList = ({
   );
 
   const MsgBubble = ({ m }) => {
-    const isMine = m.senderId === currentUserId;
-    const bg = isMine ? "primary.light" : "grey.200";
-    const senderName = nameMap[m.senderId] || m.senderRole;
-    const meta = (
-      <>
-        {senderName} <Sup>({m.senderRole.toLowerCase()})</Sup> · {formatTime(m.sentAt)}
-      </>
-    );
+    const isMine   = m.senderId === currentUserId;
+    const bubbleBg = isMine ? "primary.light" : "grey.200";
+    const sender   = nameMap[m.senderId] || m.senderRole;
+
+    const seenByStudent = !!m.seenStatus?.seenByStudent;
 
     return (
       <Box sx={{ width: "100%", display: "flex", pt: 0.5 }}>
@@ -137,7 +147,7 @@ const ChatMessageList = ({
           sx={{
             ml: isMine ? "auto" : 0,
             mr: isMine ? 0 : "auto",
-            bgcolor: bg,
+            bgcolor: bubbleBg,
             p: 1.2,
             borderRadius: 2,
             maxWidth: "75%",
@@ -146,12 +156,16 @@ const ChatMessageList = ({
           <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
             {m.text}
           </Typography>
-          <Box display="flex" alignItems="center" justifyContent="space-between" mt={0.5}>
+
+          <Box mt={0.5} display="flex" alignItems="center" justifyContent="space-between">
             <Typography variant="caption" color="text.secondary">
-              {meta}
+              {sender} <Sup>({m.senderRole.toLowerCase()})</Sup> · {formatTime(m.sentAt)}
             </Typography>
-            <Tooltip title={m.seenStatus?.seenByStudent ? "Seen by student" : "Unseen by student"}>
-              {m.seenStatus?.seenByStudent ? (
+
+            <Tooltip
+              title={seenByStudent ? "Seen by student" : "Unseen by student"}
+            >
+              {seenByStudent ? (
                 <DoneAll fontSize="small" color="primary" />
               ) : (
                 <Done fontSize="small" color="disabled" />
@@ -163,7 +177,7 @@ const ChatMessageList = ({
     );
   };
 
-  /* render */
+  /* ─────────────────────────── render ───────────────────────── */
   return (
     <Box
       ref={containerRef}
@@ -185,26 +199,30 @@ const ChatMessageList = ({
       ) : (
         <List disablePadding sx={{ display: "flex", flexDirection: "column", gap: 1, p: 2 }}>
           <div ref={topSentinel} />
+
           {loadingOlder && (
             <Box display="flex" justifyContent="center" py={1}>
               <CircularProgress size={20} />
             </Box>
           )}
+
           {(() => {
             const out = [];
             let lastDate = null;
             messages.forEach((m) => {
-              const d = dayjs(m.sentAt).format("YYYY-MM-DD");
-              if (d !== lastDate) {
-                lastDate = d;
+              const ymd = dayjs(m.sentAt).format("YYYY-MM-DD");
+              if (ymd !== lastDate) {
+                lastDate = ymd;
                 out.push(
-                  <DateBubble key={`d-${d}`} label={formatDateHeader(m.sentAt)} />
+                  <DateBubble key={`date-${ymd}`} label={formatDateHeader(m.sentAt)} />
                 );
               }
+              /* unique key uses `id` from DTO */
               out.push(<MsgBubble key={m.id} m={m} />);
             });
             return out;
           })()}
+
           <div ref={bottomRef} />
         </List>
       )}

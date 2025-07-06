@@ -26,12 +26,13 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     return http
-      .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ Enable CORS
+      .cors(cors -> cors.configurationSource(corsConfigurationSource()))
       .csrf(csrf -> csrf.disable())
       .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/auth/login").permitAll()
-        .requestMatchers("auth/logout", "auth/validate-token").authenticated()
+        .requestMatchers("/auth/logout", "/auth/validate-token").authenticated()
+        .requestMatchers("/ws/**").permitAll()          // WebSocket handshake
         .requestMatchers("/student/**").hasRole("STUDENT")
         .requestMatchers("/mentor/**").hasRole("MENTOR")
         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -41,14 +42,14 @@ public class SecurityConfig {
       .build();
   }
 
-  // ✅ CORS configuration for localhost:3000 (React frontend)
+  /* CORS for local React dev; make configurable for prod */
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
-    config.setAllowedOrigins(List.of("http://localhost:3000")); // Frontend dev server
+    config.setAllowedOrigins(List.of("http://localhost:3000"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("*")); // Accept all headers
-    config.setAllowCredentials(true); // Needed if frontend ever uses cookies or credentials
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(true);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", config);
