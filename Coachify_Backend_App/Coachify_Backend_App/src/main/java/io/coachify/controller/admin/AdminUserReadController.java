@@ -1,9 +1,9 @@
 package io.coachify.controller.admin;
 
-import io.coachify.dto.admin.StudentResponseDTO;
-import io.coachify.dto.admin.MentorResponseDTO;
-import io.coachify.dto.admin.AdminResponseDTO;
-import io.coachify.service.admin.AdminUserReadService;
+import io.coachify.dto.admin.list.StudentResponseDTO;
+import io.coachify.dto.admin.list.MentorResponseDTO;
+import io.coachify.dto.admin.list.AdminResponseDTO;
+import io.coachify.service.admin.user.AdminUserReadService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;

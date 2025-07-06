@@ -1,4 +1,4 @@
-package io.coachify.dto.admin;
+package io.coachify.dto.admin.update;
 
 import lombok.Data;
 

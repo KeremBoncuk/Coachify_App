@@ -1,4 +1,4 @@
-package io.coachify.dto.admin;
+package io.coachify.dto.admin.register;
 
 import io.coachify.entity.user.PaymentStatus;
 import lombok.Data;

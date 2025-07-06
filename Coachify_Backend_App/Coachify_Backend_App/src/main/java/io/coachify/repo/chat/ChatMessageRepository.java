@@ -2,53 +2,67 @@ package io.coachify.repo.chat;
 
 import io.coachify.entity.chat.ChatMessage;
 import org.bson.types.ObjectId;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.mongodb.repository.MongoRepository;
 
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Mongo repository for ChatMessage.
+ * Both ascending and descending helpers are provided,
+ * as well as cursor-based paging.
+ */
 public interface ChatMessageRepository extends MongoRepository<ChatMessage, ObjectId> {
 
-  /* ─────────────────────────── Standard fetch helpers ─────────────────────────── */
+  /* ─────────── Full dumps ─────────── */
 
-  List<ChatMessage> findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(
-    ObjectId chatRoomId,
-    Instant before,
-    Pageable pageable);
-
-  List<ChatMessage> findByChatRoomIdOrderBySentAtAsc(ObjectId chatRoomId);
+  /* newest → oldest */
   List<ChatMessage> findByChatRoomIdOrderBySentAtDesc(ObjectId chatRoomId);
 
-  /* ──────────────────── “mark-as-seen” convenience queries ───────────────────── */
+  /* oldest → newest  (used by student / mentor views) */
+  List<ChatMessage> findByChatRoomIdOrderBySentAtAsc(ObjectId chatRoomId);
 
-  /* ➊ Single-role helpers (kept for backward compatibility) */
-  List<ChatMessage> findByChatRoomIdAndSenderRoleAndSentAtLessThanEqualAndSeenStatus_SeenByMentorFalse(
-    ObjectId chatRoomId,
-    String senderRole,
-    Instant until);
+  /* ─────────── Paged, newest→oldest ─────────── */
 
-  List<ChatMessage> findByChatRoomIdAndSenderRoleAndSentAtLessThanEqualAndSeenStatus_SeenByStudentFalse(
-    ObjectId chatRoomId,
-    String senderRole,
-    Instant until);
+  List<ChatMessage> findByChatRoomIdOrderBySentAtDesc(
+    ObjectId chatRoomId, Pageable pageable);
 
-  /* ➋ Multi-role helpers (NEW) */
-  List<ChatMessage> findByChatRoomIdAndSenderRoleInAndSentAtLessThanEqualAndSeenStatus_SeenByStudentFalse(
-    ObjectId chatRoomId,
-    List<String> senderRoles,
-    Instant until);
+  /* EXCLUSIVE  (< before) */
+  List<ChatMessage> findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(
+    ObjectId chatRoomId, Instant before, Pageable pageable);
 
-  List<ChatMessage> findByChatRoomIdAndSenderRoleInAndSentAtLessThanEqualAndSeenStatus_SeenByMentorFalse(
-    ObjectId chatRoomId,
-    List<String> senderRoles,
-    Instant until);
+  /* INCLUSIVE (<= before) — kept for older code paths */
+  List<ChatMessage> findByChatRoomIdAndSentAtLessThanEqualOrderBySentAtDesc(
+    ObjectId chatRoomId, Instant before, Pageable pageable);
 
-  /* ─────────────── Thin wrapper used by “/limited” pagination endpoint ─────────────── */
+  /* ─────────── Seen-status convenience queries (unchanged) ─────────── */
 
-  default List<ChatMessage> findLimitedMessages(ObjectId chatRoomId, Instant before, int limit) {
-    Pageable page = Pageable.ofSize(limit);
-    Instant cutoff = (before != null) ? before : Instant.now();
-    return findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(chatRoomId, cutoff, page);
+  List<ChatMessage>
+  findByChatRoomIdAndSenderRoleAndSentAtLessThanEqualAndSeenStatus_SeenByMentorFalse(
+    ObjectId chatRoomId, String senderRole, Instant until);
+
+  List<ChatMessage>
+  findByChatRoomIdAndSenderRoleAndSentAtLessThanEqualAndSeenStatus_SeenByStudentFalse(
+    ObjectId chatRoomId, String senderRole, Instant until);
+
+  List<ChatMessage>
+  findByChatRoomIdAndSenderRoleInAndSentAtLessThanEqualAndSeenStatus_SeenByStudentFalse(
+    ObjectId chatRoomId, List<String> senderRoles, Instant until);
+
+  List<ChatMessage>
+  findByChatRoomIdAndSenderRoleInAndSentAtLessThanEqualAndSeenStatus_SeenByMentorFalse(
+    ObjectId chatRoomId, List<String> senderRoles, Instant until);
+
+  /* ─────────── Convenience wrapper (optional) ─────────── */
+
+  default List<ChatMessage> findLimitedMessages(
+    ObjectId chatRoomId, Instant before, int limit) {
+
+    Pageable page = PageRequest.of(0, limit);
+    return (before == null)
+      ? findByChatRoomIdOrderBySentAtDesc(chatRoomId, page)
+      : findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(chatRoomId, before, page);
   }
 }

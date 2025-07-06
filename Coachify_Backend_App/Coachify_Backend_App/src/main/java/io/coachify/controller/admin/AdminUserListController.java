@@ -1,9 +1,9 @@
 package io.coachify.controller.admin;
 
-import io.coachify.dto.admin.AllUsersResponseDTO;
-import io.coachify.dto.admin.StudentResponseDTO;
-import io.coachify.dto.admin.MentorResponseDTO;
-import io.coachify.service.admin.AdminUserListingService;
+import io.coachify.dto.admin.list.AllUsersResponseDTO;
+import io.coachify.dto.admin.list.StudentResponseDTO;
+import io.coachify.dto.admin.list.MentorResponseDTO;
+import io.coachify.service.admin.user.AdminUserListingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,26 +14,27 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")  //Restrict all endpoints in this controller
+@PreAuthorize("hasRole('ADMIN')")          // 🔐 restrict controller
 public class AdminUserListController {
 
-  private final AdminUserListingService adminUserListingService;
+  private final AdminUserListingService listingService;
 
   @GetMapping("/students")
-  public ResponseEntity<List<StudentResponseDTO>> getAllStudents() {
-    List<StudentResponseDTO> students = adminUserListingService.getAllStudents();
-    return ResponseEntity.ok(students);
+  public ResponseEntity<List<StudentResponseDTO>> getStudents(
+    @RequestParam(value = "onlyActive", required = false) Boolean onlyActive) {
+
+    return ResponseEntity.ok(listingService.getAllStudents(onlyActive));
   }
 
   @GetMapping("/mentors")
-  public ResponseEntity<List<MentorResponseDTO>> getAllMentors() {
-    List<MentorResponseDTO> mentors = adminUserListingService.getAllMentors();
-    return ResponseEntity.ok(mentors);
+  public ResponseEntity<List<MentorResponseDTO>> getMentors(
+    @RequestParam(value = "onlyActive", required = false) Boolean onlyActive) {
+
+    return ResponseEntity.ok(listingService.getAllMentors(onlyActive));
   }
 
   @GetMapping("/all-users")
   public ResponseEntity<AllUsersResponseDTO> getAllUsers() {
-    AllUsersResponseDTO response = adminUserListingService.getAllUsersGrouped();
-    return ResponseEntity.ok(response);
+    return ResponseEntity.ok(listingService.getAllUsersGrouped());
   }
 }

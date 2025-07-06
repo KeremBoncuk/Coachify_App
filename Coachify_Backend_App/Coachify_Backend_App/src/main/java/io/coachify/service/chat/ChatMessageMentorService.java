@@ -1,10 +1,11 @@
-// src/main/java/io/coachify/service/chat/ChatMessageMentorService.java
 package io.coachify.service.chat;
 
 import io.coachify.dto.chat.mentor.*;
 import io.coachify.entity.chat.*;
 import io.coachify.entity.user.Mentor;
+import io.coachify.entity.user.Student;
 import io.coachify.repo.MentorRepository;
+import io.coachify.repo.StudentRepository;
 import io.coachify.repo.chat.ChatMessageRepository;
 import io.coachify.repo.chat.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,103 +21,106 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatMessageMentorService {
 
-  private final ChatRoomRepository chatRoomRepository;
-  private final ChatMessageRepository chatMessageRepository;
-  private final MentorRepository mentorRepository;
+  private final ChatRoomRepository    roomRepo;
+  private final ChatMessageRepository msgRepo;
+  private final MentorRepository      mentorRepo;
+  private final StudentRepository     studentRepo;   // ✅ added to fetch student names
 
-  /* ───────────────────────────── 1. SEND MESSAGE ───────────────────────────── */
+  /* 1 ─ SEND */
   public void sendMessageByMentor(ObjectId mentorId, MentorSendMessageRequest req) {
 
-    Mentor mentor = mentorRepository.findById(mentorId)
+    Mentor mentor = mentorRepo.findById(mentorId)
       .orElseThrow(() -> new IllegalArgumentException("Mentor not found"));
 
-    ObjectId chatRoomId = new ObjectId(req.chatRoomId());
-    ChatRoom room = chatRoomRepository.findById(chatRoomId)
+    ObjectId roomId = new ObjectId(req.chatRoomId());
+    ChatRoom room   = roomRepo.findById(roomId)
       .orElseThrow(() -> new IllegalArgumentException("Chat room not found"));
 
-    if (!room.isActive())                      throw new IllegalStateException("Chat room inactive");
-    if (!room.getMentorId().equals(mentorId))  throw new SecurityException("Mentor not in this chat room");
+    if (!room.isActive())                     throw new IllegalStateException("Chat room inactive");
+    if (!room.getMentorId().equals(mentorId)) throw new SecurityException("Mentor not in this room");
 
-    boolean emptyText = !StringUtils.hasText(req.text());
+    boolean textEmpty = !StringUtils.hasText(req.text());
     boolean noMedia   = req.mediaUrls() == null || req.mediaUrls().isEmpty();
-    if (emptyText && noMedia)
+    if (textEmpty && noMedia)
       throw new IllegalArgumentException("Message must contain text or media");
 
-    ChatMessage msg = new ChatMessage();
-    msg.setChatRoomId(chatRoomId);
-    msg.setSenderId(mentorId);
-    msg.setSenderRole("MENTOR");
-    msg.setText(req.text());
-    msg.setMediaUrls(noMedia ? List.of() : req.mediaUrls());
-    msg.setSentAt(Instant.now());
-    msg.setSeenStatus(new SeenStatus(false, true));   // mentor sees own message
+    ChatMessage m = new ChatMessage();
+    m.setChatRoomId(roomId);
+    m.setSenderId(mentorId);
+    m.setSenderRole("MENTOR");
+    m.setText(req.text());
+    m.setMediaUrls(noMedia ? List.of() : req.mediaUrls());
+    m.setSentAt(Instant.now());
+    m.setSeenStatus(new SeenStatus(false, true));         // mentor sees own
 
-    chatMessageRepository.save(msg);
+    msgRepo.save(m);
   }
 
-  /* ─────────────────── 2. ACTIVE ROOMS (IDs AS STRING) ─────────────────────── */
+  /* 2 ─ ACTIVE ROOMS (with student full name) */
   public List<MentorChatRoomDTO> getActiveChatRoomsForMentor(ObjectId mentorId) {
-    return chatRoomRepository.findByMentorIdAndIsActiveTrue(mentorId).stream()
-      .map(r -> new MentorChatRoomDTO(
-        r.getId().toHexString(),
-        r.getStudentId().toHexString(),
-        r.getMentorId().toHexString(),
-        r.getCreatedAt(),
-        r.isActive()))
+    return roomRepo.findByMentorIdAndIsActiveTrue(mentorId).stream()
+      .map(r -> {
+        String studentName = studentRepo.findById(r.getStudentId())
+          .map(Student::getFullName)
+          .orElse("(unknown)");
+        return new MentorChatRoomDTO(
+          r.getId().toHexString(),
+          r.getStudentId().toHexString(),
+          r.getMentorId().toHexString(),
+          studentName,                        // ✅ inject full name here
+          r.getCreatedAt(),
+          r.isActive());
+      })
       .toList();
   }
 
-  /* ──────────────── 3. PAGINATED MESSAGES (robust + correct) ──────────────── */
+  /* 3 ─ PAGINATED (cursor exclusive) */
   public MentorChatMessagesResponse getMessages(
-    ObjectId mentorId,
-    ObjectId chatRoomId,
-    Instant before,
-    int limit
-  ) {
-    ChatRoom room = chatRoomRepository.findByIdAndIsActiveTrue(chatRoomId)
-      .orElseThrow(() -> new IllegalArgumentException("Chat room not found or inactive"));
+    ObjectId mentorId, ObjectId chatRoomId, Instant before, int limit) {
+
+    ChatRoom room = roomRepo.findByIdAndIsActiveTrue(chatRoomId)
+      .orElseThrow(() -> new IllegalArgumentException("Chat room not found / inactive"));
     if (!room.getMentorId().equals(mentorId))
-      throw new SecurityException("Mentor not in this chat room");
+      throw new SecurityException("Mentor not in this room");
 
     if (limit < 1 || limit > 100) limit = 20;
 
-    var page = PageRequest.of(0, limit + 1);                    // over-fetch by 1
-    List<ChatMessage> fetched = chatMessageRepository
-      .findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(chatRoomId, before, page);
+    var page = PageRequest.of(0, limit + 1);   // ask one extra
+    List<ChatMessage> raw = (before == null)
+      ? msgRepo.findByChatRoomIdOrderBySentAtDesc(chatRoomId, page)
+      : msgRepo.findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(chatRoomId, before, page);
 
-    boolean hasMore = fetched.size() > limit;
-    List<ChatMessage> limited = hasMore ? fetched.subList(0, limit) : fetched;
+    boolean hasMore = raw.size() > limit;
+    if (hasMore) raw = raw.subList(0, limit);
 
-    List<MentorChatMessageDTO> dtos = limited.stream().map(this::toDto).toList();
-    Instant nextBefore = dtos.isEmpty() ? before : dtos.get(dtos.size() - 1).sentAt();
+    List<MentorChatMessageDTO> dto = raw.stream().map(this::toDto).toList();
+    Instant nextBefore = dto.isEmpty() ? before : dto.get(dto.size() - 1).sentAt();
 
-    return new MentorChatMessagesResponse(dtos, nextBefore, hasMore);
+    return new MentorChatMessagesResponse(dto, nextBefore, hasMore);
   }
 
-  /* ─────────────────────── 4. ALL MESSAGES (ASC ORDER) ─────────────────────── */
+  /* 4 ─ FULL DUMP (ascending) */
   public List<MentorChatMessageDTO> getAllMessages(ObjectId mentorId, ObjectId chatRoomId) {
-    ChatRoom room = chatRoomRepository.findByIdAndIsActiveTrue(chatRoomId)
-      .orElseThrow(() -> new IllegalArgumentException("Chat room not found or inactive"));
+    ChatRoom room = roomRepo.findByIdAndIsActiveTrue(chatRoomId)
+      .orElseThrow(() -> new IllegalArgumentException("Chat room not found / inactive"));
     if (!room.getMentorId().equals(mentorId))
-      throw new SecurityException("Mentor not in this chat room");
+      throw new SecurityException("Mentor not in this room");
 
-    return chatMessageRepository.findByChatRoomIdOrderBySentAtAsc(chatRoomId).stream()
+    return msgRepo.findByChatRoomIdOrderBySentAtAsc(chatRoomId).stream()
       .map(this::toDto)
       .toList();
   }
 
-  /* ──────────────── 5. MARK STUDENT MESSAGES AS SEEN ───────────────────────── */
+  /* 5 ─ MARK AS SEEN */
   public void markMessagesAsSeen(ObjectId mentorId, ObjectId chatRoomId, Instant until) {
 
-    ChatRoom room = chatRoomRepository.findByIdAndIsActiveTrue(chatRoomId)
-      .orElseThrow(() -> new IllegalArgumentException("Chat room not found or inactive"));
-
+    ChatRoom room = roomRepo.findByIdAndIsActiveTrue(chatRoomId)
+      .orElseThrow(() -> new IllegalArgumentException("Chat room not found / inactive"));
     if (!room.getMentorId().equals(mentorId))
-      throw new SecurityException("Mentor not in this chat room");
+      throw new SecurityException("Mentor not in this room");
 
-    /* fetch both STUDENT and ADMIN messages that the mentor hasn’t seen yet */
     List<String> roles = List.of("STUDENT", "ADMIN");
-    List<ChatMessage> unseen = chatMessageRepository
+    List<ChatMessage> unseen = msgRepo
       .findByChatRoomIdAndSenderRoleInAndSentAtLessThanEqualAndSeenStatus_SeenByMentorFalse(
         chatRoomId, roles, until);
 
@@ -124,11 +128,10 @@ public class ChatMessageMentorService {
       m.getSeenStatus().setSeenByMentor(true);
       m.setSeenAt(Instant.now());
     });
-    chatMessageRepository.saveAll(unseen);
+    msgRepo.saveAll(unseen);
   }
 
-
-  /* ───────────────────────────── helper → DTO ─────────────────────────────── */
+  /* helper */
   private MentorChatMessageDTO toDto(ChatMessage m) {
     return new MentorChatMessageDTO(
       m.getId().toHexString(),

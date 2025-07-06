@@ -71,7 +71,7 @@ public class ChatRoomAdminService {
     Mentor mentor = mentorRepository.findById(mentorId)
       .orElseThrow(() -> new BadRequestException("Mentor not found"));
 
-    if (!mentor.getAssignedStudents().contains(studentId)) {
+    if (!mentorId.equals(student.getAssignedMentor())) {
       throw new BadRequestException("Mentor is not assigned to this student");
     }
 

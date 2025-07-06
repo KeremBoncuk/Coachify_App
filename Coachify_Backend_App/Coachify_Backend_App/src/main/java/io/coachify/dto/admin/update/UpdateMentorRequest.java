@@ -1,18 +1,14 @@
-package io.coachify.dto.admin;
+package io.coachify.dto.admin.update;
 
 import io.coachify.entity.user.SubjectArea;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class MentorResponseDTO {
-  private String id;
+public class UpdateMentorRequest {
+  private String id;  // ObjectId as hex string
+
   private String fullName;
   private String email;
   private String phoneNumber;
@@ -26,7 +22,6 @@ public class MentorResponseDTO {
   private String iban;
   private String notes;
 
-  private List<String> assignedStudents; // ObjectIds as hex strings
   private boolean active;
   private LocalDate abandonmentDate;
 }

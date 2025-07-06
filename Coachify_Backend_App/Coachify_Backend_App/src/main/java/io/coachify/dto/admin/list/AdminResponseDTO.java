@@ -1,4 +1,4 @@
-package io.coachify.dto.admin;
+package io.coachify.dto.admin.list;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

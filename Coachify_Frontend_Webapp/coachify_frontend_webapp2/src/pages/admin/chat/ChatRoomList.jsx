@@ -8,21 +8,11 @@ import {
   CircularProgress,
 } from "@mui/material";
 
-/* tiny helper for superscript styling */
 const Sup = ({ children }) => (
   <sup style={{ fontSize: "0.7em", verticalAlign: "super" }}>{children}</sup>
 );
 
-/**
- * AdminChatRoomList
- * -----------------
- * Props:
- *  • chatRooms  [{id, mentorFullName, studentFullName, isActive}]
- *  • selectedId
- *  • onSelect(id)
- *  • loading
- */
-const AdminChatRoomList = ({ chatRooms, selectedId, onSelect, loading }) => (
+const ChatRoomList = ({ chatRooms, selectedId, onSelect, loading }) => (
   <Box flex={1} overflow="auto">
     {loading ? (
       <Box display="flex" alignItems="center" justifyContent="center" height="100%">
@@ -61,4 +51,4 @@ const AdminChatRoomList = ({ chatRooms, selectedId, onSelect, loading }) => (
   </Box>
 );
 
-export default AdminChatRoomList;
+export default ChatRoomList;

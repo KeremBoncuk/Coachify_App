@@ -1,8 +1,8 @@
-package io.coachify.service.admin;
+package io.coachify.service.admin.user;
 
-import io.coachify.dto.admin.AdminResponseDTO;
-import io.coachify.dto.admin.MentorResponseDTO;
-import io.coachify.dto.admin.StudentResponseDTO;
+import io.coachify.dto.admin.list.AdminResponseDTO;
+import io.coachify.dto.admin.list.MentorResponseDTO;
+import io.coachify.dto.admin.list.StudentResponseDTO;
 import io.coachify.entity.user.Admin;
 import io.coachify.entity.user.Mentor;
 import io.coachify.entity.user.Student;
@@ -60,9 +60,6 @@ public class AdminUserReadService {
       mentor.getBirthDate(),
       mentor.getIban(),
       mentor.getNotes(),
-      mentor.getAssignedStudents().stream()
-        .map(ObjectId::toHexString)
-        .toList(),
       mentor.isActive(),
       mentor.getAbandonmentDate()
     );

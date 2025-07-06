@@ -7,7 +7,6 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -32,8 +31,6 @@ public class Mentor {
   private LocalDate birthDate;
   private String iban;
   private String notes;
-
-  private List<ObjectId> assignedStudents;
 
   private boolean active;
   private LocalDate abandonmentDate;

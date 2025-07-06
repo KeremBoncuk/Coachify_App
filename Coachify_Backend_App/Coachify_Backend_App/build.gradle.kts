@@ -29,6 +29,9 @@ dependencies {
   // Spring Security support
   implementation("org.springframework.boot:spring-boot-starter-security")
 
+  // WebSocket + STOMP support (new addition)
+  implementation("org.springframework.boot:spring-boot-starter-websocket")
+
   // JWT: API + impl + Jackson integration
   implementation("io.jsonwebtoken:jjwt-api:0.11.5")
   runtimeOnly("io.jsonwebtoken:jjwt-impl:0.11.5")
@@ -40,6 +43,9 @@ dependencies {
   // Lombok
   implementation("org.projectlombok:lombok:1.18.30")
   annotationProcessor("org.projectlombok:lombok:1.18.30")
+
+  // Validation support
+  implementation("org.springframework.boot:spring-boot-starter-validation")
 
   // Test dependencies
   testImplementation("org.springframework.boot:spring-boot-starter-test")

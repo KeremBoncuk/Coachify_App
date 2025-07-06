@@ -9,24 +9,32 @@ import java.util.Optional;
 
 public interface ChatRoomRepository extends MongoRepository<ChatRoom, ObjectId> {
 
+  /* ────────────── Lookup helpers ────────────── */
+
+  // Active rooms
   List<ChatRoom> findByStudentIdAndIsActiveTrue(ObjectId studentId);
-
   List<ChatRoom> findByMentorIdAndIsActiveTrue(ObjectId mentorId);
-
-  List<ChatRoom> findByStudentId(ObjectId studentId);
-
-  List<ChatRoom> findByMentorId(ObjectId mentorId);
-
   List<ChatRoom> findByIsActiveTrue();
 
+  // All rooms (any state)
+  List<ChatRoom> findByStudentId(ObjectId studentId);
+  List<ChatRoom> findByMentorId(ObjectId mentorId);
+
+  // By ID helpers
   Optional<ChatRoom> findByIdAndIsActiveTrue(ObjectId id);
 
+  // By student-mentor pair
   Optional<ChatRoom> findByStudentIdAndMentorId(ObjectId studentId, ObjectId mentorId);
+  Optional<ChatRoom> findByStudentIdAndMentorIdAndIsActiveTrue(ObjectId studentId, ObjectId mentorId);
+
+  /* ────────────── Misc ────────────── */
 
   boolean existsById(ObjectId id);
 
-  // Placeholder: implement filtering logic manually in service if needed
+  // Placeholder for custom filtering (optional @Query implementation)
   default List<ChatRoom> findAllWithStudentMentorFiltered(String fullNameFilter, boolean onlyActive) {
-    throw new UnsupportedOperationException("Custom filtering logic should be implemented in service layer or using @Query if needed.");
+    throw new UnsupportedOperationException(
+      "Implement custom filtering logic in service layer or with @Query if required."
+    );
   }
 }

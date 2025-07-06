@@ -1,18 +1,14 @@
 package io.coachify.service.chat;
 
-import io.coachify.dto.chat.admin.AdminChatMessageResponse;
-import io.coachify.dto.chat.admin.AdminSendMessageRequest;
-import io.coachify.entity.chat.ChatMessage;
-import io.coachify.entity.chat.ChatRoom;
-import io.coachify.entity.chat.SeenStatus;
+import io.coachify.dto.chat.admin.*;
+import io.coachify.entity.chat.*;
 import io.coachify.entity.user.Admin;
-import io.coachify.exception.BadRequestException;
-import io.coachify.exception.NotFoundException;
+import io.coachify.exception.*;
 import io.coachify.repo.AdminRepository;
-import io.coachify.repo.chat.ChatMessageRepository;
-import io.coachify.repo.chat.ChatRoomRepository;
+import io.coachify.repo.chat.*;
 import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,76 +18,95 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ChatMessageAdminService {
 
-  private final ChatRoomRepository chatRoomRepository;
-  private final ChatMessageRepository chatMessageRepository;
-  private final AdminRepository adminRepository;
+  private final ChatRoomRepository    roomRepo;
+  private final ChatMessageRepository msgRepo;
+  private final AdminRepository       adminRepo;
 
-  public List<AdminChatMessageResponse> getAllMessages(ObjectId chatRoomId) {
-    validateRoomExists(chatRoomId);
-    return chatMessageRepository.findByChatRoomIdOrderBySentAtDesc(chatRoomId)
+  /* ───────────────────────────────────────────────────────────────
+     Legacy “dump all messages” — kept because other services still
+     depend on it (e.g. student / mentor view).
+  ─────────────────────────────────────────────────────────────── */
+  public List<AdminChatMessageResponse> getAllMessages(ObjectId roomId) {
+    validateRoomExists(roomId);
+    return msgRepo.findByChatRoomIdOrderBySentAtDesc(roomId)
       .stream()
-      .map(this::toMessageResponse)
+      .map(this::toDto)
       .toList();
   }
 
-  public List<AdminChatMessageResponse> getLimitedMessages(ObjectId chatRoomId, Instant before, int limit) {
-    validateRoomExists(chatRoomId);
-    if (limit <= 0 || limit > 100) {
-      throw new BadRequestException("Limit must be between 1 and 100");
-    }
-    return chatMessageRepository.findLimitedMessages(chatRoomId, before, limit)
-      .stream()
-      .map(this::toMessageResponse)
-      .toList();
+  /* ────────────────── Paginated newest→oldest (exclusive cursor) ────────────────── */
+  public AdminChatMessagePage getPaginatedMessages(
+    ObjectId roomId, Instant before, Integer limit) {
+
+    validateRoomExists(roomId);
+
+    int size = (limit == null || limit <= 0 || limit > 100) ? 20 : limit;
+    var pageable = PageRequest.of(0, size + 1);            // ask +1 for hasMore
+
+    List<ChatMessage> raw = (before == null)
+      ? msgRepo.findByChatRoomIdOrderBySentAtDesc(roomId, pageable)
+      : msgRepo.findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(roomId, before, pageable);
+
+    boolean hasMore = raw.size() > size;
+    if (hasMore) raw = raw.subList(0, size);
+
+    List<AdminChatMessageResponse> dto =
+      raw.stream().map(this::toDto).toList();
+
+    Instant nextBefore = hasMore
+      ? raw.get(raw.size() - 1).getSentAt()
+      : null;
+
+    return new AdminChatMessagePage(dto, hasMore, nextBefore);
   }
 
-  public AdminChatMessageResponse sendMessage(ObjectId chatRoomId, AdminSendMessageRequest request, ObjectId adminId) {
-    ChatRoom room = chatRoomRepository.findById(chatRoomId)
+  /* ───────────────────────── sendMessage (unchanged) ───────────────────────── */
+  public AdminChatMessageResponse sendMessage(ObjectId roomId,
+                                              AdminSendMessageRequest req,
+                                              ObjectId adminId) {
+
+    ChatRoom room = roomRepo.findById(roomId)
       .orElseThrow(() -> new NotFoundException("Chat room not found"));
 
-    if (!room.isActive()) {
+    if (!room.isActive())
       throw new BadRequestException("Cannot send message to an inactive chat room");
-    }
 
-    Admin admin = adminRepository.findById(adminId)
+    adminRepo.findById(adminId)
       .orElseThrow(() -> new NotFoundException("Admin not found"));
 
-    boolean hasText = request.text() != null && !request.text().isBlank();
-    boolean hasMedia = request.mediaUrls() != null && !request.mediaUrls().isEmpty();
+    boolean hasText  = req.text() != null  && !req.text().isBlank();
+    boolean hasMedia = req.mediaUrls() != null && !req.mediaUrls().isEmpty();
+    if (!hasText && !hasMedia)
+      throw new BadRequestException("Message must contain text or media");
 
-    if (!hasText && !hasMedia) {
-      throw new BadRequestException("Message must have either text or media");
-    }
+    ChatMessage m = new ChatMessage();
+    m.setChatRoomId(roomId);
+    m.setSenderId(adminId);
+    m.setSenderRole("ADMIN");
+    m.setText(req.text());
+    m.setMediaUrls(req.mediaUrls());
+    m.setSentAt(Instant.now());
+    m.setSeenStatus(new SeenStatus(false, false));
 
-    ChatMessage message = new ChatMessage();
-    message.setChatRoomId(chatRoomId);
-    message.setSenderId(adminId);
-    message.setSenderRole("ADMIN");
-    message.setText(request.text());
-    message.setMediaUrls(request.mediaUrls());
-    message.setSentAt(Instant.now());
-    message.setSeenStatus(new SeenStatus(false, false));
-    message.setSeenAt(null);
-
-    return toMessageResponse(chatMessageRepository.save(message));
+    return toDto(msgRepo.save(m));
   }
 
-  private void validateRoomExists(ObjectId chatRoomId) {
-    if (!chatRoomRepository.existsById(chatRoomId)) {
+  /* ───────────────────────── helpers ───────────────────────── */
+  private void validateRoomExists(ObjectId id) {
+    if (!roomRepo.existsById(id))
       throw new NotFoundException("Chat room not found");
-    }
   }
 
-  private AdminChatMessageResponse toMessageResponse(ChatMessage msg) {
+  private AdminChatMessageResponse toDto(ChatMessage m) {
     return new AdminChatMessageResponse(
-      msg.getId().toHexString(),
-      msg.getChatRoomId().toHexString(),
-      msg.getSenderId().toHexString(),
-      msg.getSenderRole(),
-      msg.getText(),
-      msg.getMediaUrls(),
-      msg.getSentAt(),
-      msg.getSeenAt()
+      m.getId().toHexString(),
+      m.getChatRoomId().toHexString(),
+      m.getSenderId().toHexString(),
+      m.getSenderRole(),
+      m.getText(),
+      m.getMediaUrls(),
+      m.getSentAt(),
+      m.getSeenAt()
     );
   }
 }

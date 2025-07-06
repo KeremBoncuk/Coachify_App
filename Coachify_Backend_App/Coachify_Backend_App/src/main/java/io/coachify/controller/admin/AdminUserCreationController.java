@@ -1,14 +1,16 @@
 package io.coachify.controller.admin;
 
-import io.coachify.dto.admin.CreatedUserResponse;
-import io.coachify.dto.admin.RegisterAdminRequest;
-import io.coachify.dto.admin.RegisterMentorRequest;
-import io.coachify.dto.admin.RegisterStudentRequest;
-import io.coachify.service.admin.AdminUserCreationService;
+import io.coachify.dto.admin.register.CreatedUserResponse;
+import io.coachify.dto.admin.register.RegisterAdminRequest;
+import io.coachify.dto.admin.register.RegisterMentorRequest;
+import io.coachify.dto.admin.register.RegisterStudentRequest;
+import io.coachify.service.admin.user.AdminUserCreationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import jakarta.validation.Valid;
 
 import static org.springframework.http.HttpStatus.CREATED;
 
@@ -21,19 +23,19 @@ public class AdminUserCreationController {
   private final AdminUserCreationService creationService;
 
   @PostMapping("/register-student")
-  public ResponseEntity<CreatedUserResponse> registerStudent(@RequestBody RegisterStudentRequest request) {
+  public ResponseEntity<CreatedUserResponse> registerStudent(@RequestBody @Valid RegisterStudentRequest request) {
     var id = creationService.registerStudent(request);
     return ResponseEntity.status(CREATED).body(new CreatedUserResponse(id.toHexString()));
   }
 
   @PostMapping("/register-mentor")
-  public ResponseEntity<CreatedUserResponse> registerMentor(@RequestBody RegisterMentorRequest request) {
+  public ResponseEntity<CreatedUserResponse> registerMentor(@RequestBody @Valid RegisterMentorRequest request) {
     var id = creationService.registerMentor(request);
     return ResponseEntity.status(CREATED).body(new CreatedUserResponse(id.toHexString()));
   }
 
   @PostMapping("/register-admin")
-  public ResponseEntity<CreatedUserResponse> registerAdmin(@RequestBody RegisterAdminRequest request) {
+  public ResponseEntity<CreatedUserResponse> registerAdmin(@RequestBody @Valid RegisterAdminRequest request) {
     var id = creationService.registerAdmin(request);
     return ResponseEntity.status(CREATED).body(new CreatedUserResponse(id.toHexString()));
   }

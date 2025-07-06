@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -50,7 +51,7 @@ public class ChatRoomAdminController {
    */
   @PostMapping("/create-chatroom")
   @ResponseStatus(HttpStatus.CREATED)
-  public AdminChatRoomResponse createChatRoom(@RequestBody CreateChatRoomRequest request) {
+  public AdminChatRoomResponse createChatRoom(@RequestBody @Valid CreateChatRoomRequest request) {
     return chatRoomService.createChatRoom(request);
   }
 
@@ -62,7 +63,7 @@ public class ChatRoomAdminController {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void updateChatRoomStatus(
     @RequestParam String chatRoomId,
-    @RequestBody UpdateChatRoomRequest request
+    @RequestBody @Valid UpdateChatRoomRequest request
   ) {
     chatRoomService.updateChatRoomStatus(new ObjectId(chatRoomId), request.active());
   }

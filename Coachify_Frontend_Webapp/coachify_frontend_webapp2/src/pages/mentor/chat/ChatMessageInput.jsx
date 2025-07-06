@@ -3,14 +3,13 @@ import { Send } from "@mui/icons-material";
 import { useState } from "react";
 
 /**
- * ChatMessageInput
- * ----------------
  * Props:
- *  • disabled: Boolean
- *  • onSend(text): Promise
+ *  • disabled         boolean
+ *  • onSend(text)     Promise
  */
 const ChatMessageInput = ({ onSend, disabled }) => {
   const [value, setValue] = useState("");
+
   const handleSend = async () => {
     if (!value.trim()) return;
     await onSend(value.trim());
@@ -46,7 +45,11 @@ const ChatMessageInput = ({ onSend, disabled }) => {
         variant="outlined"
         sx={{ mr: 1 }}
       />
-      <IconButton color="primary" disabled={disabled || !value.trim()}>
+      <IconButton
+        color="primary"
+        disabled={disabled || !value.trim()}
+        onClick={handleSend}
+      >
         <Send />
       </IconButton>
     </Paper>

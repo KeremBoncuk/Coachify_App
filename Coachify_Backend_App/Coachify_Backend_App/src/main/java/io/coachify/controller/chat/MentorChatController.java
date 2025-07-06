@@ -1,4 +1,3 @@
-// src/main/java/io/coachify/controller/chat/MentorChatController.java
 package io.coachify.controller.chat;
 
 import io.coachify.dto.chat.mentor.*;
@@ -12,6 +11,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.time.Instant;
 import java.util.List;
 
@@ -23,58 +23,61 @@ public class MentorChatController {
 
   private final ChatMessageMentorService chatService;
 
-  /* 1. SEND */
+  /* 1 ─ SEND */
   @PostMapping("/send-message")
   public ResponseEntity<Void> send(
     @AuthenticationPrincipal CustomPrincipal p,
-    @RequestBody MentorSendMessageRequest req
-  ) {
+    @RequestBody @Valid MentorSendMessageRequest req) {
+
     chatService.sendMessageByMentor(p.getUserId(), req);
     return ResponseEntity.ok().build();
   }
 
-  /* 2. ACTIVE ROOMS (String IDs) */
+  /* 2 ─ ACTIVE ROOMS */
   @GetMapping("/rooms")
   public ResponseEntity<List<MentorChatRoomDTO>> rooms(
     @AuthenticationPrincipal CustomPrincipal p) {
+
     return ResponseEntity.ok(chatService.getActiveChatRoomsForMentor(p.getUserId()));
   }
 
-  /* 3. PAGINATED */
+  /* 3 ─ PAGINATED (cursor < before, limit) */
   @GetMapping("/messages")
   public ResponseEntity<MentorChatMessagesResponse> messages(
     @AuthenticationPrincipal CustomPrincipal p,
     @RequestParam String chatRoomId,
     @RequestParam(required = false)
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant before,
-    @RequestParam(defaultValue = "20") int limit
-  ) {
-    Instant safeBefore = before != null ? before : Instant.now();
+    @RequestParam(defaultValue = "20") int limit) {
+
     return ResponseEntity.ok(
-      chatService.getMessages(p.getUserId(), new ObjectId(chatRoomId), safeBefore, limit)
-    );
+      chatService.getMessages(
+        p.getUserId(),
+        new ObjectId(chatRoomId),
+        before,        // null → first page
+        limit));
   }
 
-  /* 4. ALL MESSAGES */
+  /* 4 ─ FULL DUMP  (kept for export tools) */
   @GetMapping("/messages/all")
   public ResponseEntity<List<MentorChatMessageDTO>> all(
     @AuthenticationPrincipal CustomPrincipal p,
-    @RequestParam String chatRoomId
-  ) {
+    @RequestParam String chatRoomId) {
+
     return ResponseEntity.ok(
-      chatService.getAllMessages(p.getUserId(), new ObjectId(chatRoomId))
-    );
+      chatService.getAllMessages(p.getUserId(), new ObjectId(chatRoomId)));
   }
 
-  /* 5. MARK SEEN */
+  /* 5 ─ MARK SEEN */
   @PostMapping("/messages/seen")
   public ResponseEntity<Void> seen(
     @AuthenticationPrincipal CustomPrincipal p,
     @RequestParam String chatRoomId,
     @RequestParam
-    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant seenUntil
-  ) {
-    chatService.markMessagesAsSeen(p.getUserId(), new ObjectId(chatRoomId), seenUntil);
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant seenUntil) {
+
+    chatService.markMessagesAsSeen(
+      p.getUserId(), new ObjectId(chatRoomId), seenUntil);
     return ResponseEntity.ok().build();
   }
 }

@@ -1,8 +1,8 @@
-package io.coachify.service.admin;
+package io.coachify.service.admin.user;
 
-import io.coachify.dto.admin.RegisterAdminRequest;
-import io.coachify.dto.admin.RegisterMentorRequest;
-import io.coachify.dto.admin.RegisterStudentRequest;
+import io.coachify.dto.admin.register.RegisterAdminRequest;
+import io.coachify.dto.admin.register.RegisterMentorRequest;
+import io.coachify.dto.admin.register.RegisterStudentRequest;
 import io.coachify.entity.user.*;
 import io.coachify.repo.AdminRepository;
 import io.coachify.repo.MentorRepository;
@@ -13,7 +13,6 @@ import org.bson.types.ObjectId;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.Collections;
 
 @Service
@@ -85,7 +84,6 @@ public class AdminUserCreationService {
     mentor.setIban(req.getIban());
     mentor.setNotes(req.getNotes());
 
-    mentor.setAssignedStudents(Collections.emptyList());
     mentor.setActive(true);
     mentor.setAbandonmentDate(null);
 

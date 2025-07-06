@@ -1,24 +1,22 @@
-package io.coachify.dto.admin;
+package io.coachify.dto.admin.update;
 
 import io.coachify.entity.user.MentorChangeRecord;
 import io.coachify.entity.user.PaymentStatus;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.List;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class StudentResponseDTO {
-  private String id;
+public class UpdateStudentRequest {
+  private String id;  // ObjectId as hex string
+
   private String fullName;
   private String email;
   private String phoneNumber;
 
-  private String assignedMentor; // ObjectId as hex string (nullable)
+  // REMOVED: assignedMentor (mentor is now assigned via a separate endpoint)
+
   private LocalDate purchaseDate;
   private LocalDate subscriptionStartDate;
   private LocalDate nextPaymentDate;

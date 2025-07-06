@@ -1,16 +1,20 @@
-package io.coachify.dto.admin;
+package io.coachify.dto.admin.list;
 
 import io.coachify.entity.user.SubjectArea;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
 @Data
-public class RegisterMentorRequest {
+@NoArgsConstructor
+@AllArgsConstructor
+public class MentorResponseDTO {
+  private String id;
   private String fullName;
   private String email;
   private String phoneNumber;
-  private String password;
 
   private String school;
   private String department;
@@ -20,4 +24,7 @@ public class RegisterMentorRequest {
   private LocalDate birthDate;
   private String iban;
   private String notes;
+
+  private boolean active;
+  private LocalDate abandonmentDate;
 }

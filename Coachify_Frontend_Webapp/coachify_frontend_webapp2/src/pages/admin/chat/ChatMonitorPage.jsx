@@ -9,29 +9,36 @@ import {
 } from "@mui/material";
 import { useEffect, useState, useCallback } from "react";
 
-import AdminChatRoomList     from "../../../components/chat/AdminChatRoomList";
-import AdminChatMessageList  from "../../../components/chat/AdminChatMessageList";
-import AdminChatMessageInput from "../../../components/chat/AdminChatMessageInput";
+import ChatRoomList     from "./ChatRoomList";
+import ChatMessageList  from "./ChatMessageList";
+import ChatMessageInput from "./ChatMessageInput";
 
 import {
   getChatRooms,
-  getMessages,
+  getMessagesPage,
   sendMessage,
 } from "../../../api/adminChat";
 
+const PAGE_SIZE = 20;
+
 const ChatMonitorPage = () => {
-  /* ─── STATE ───────────────────────────────────────── */
-  const [chatRooms, setChatRooms]           = useState([]);
-  const [roomsLoading, setRoomsLoading]     = useState(true);
+  /* ───────────── rooms state ───────────── */
+  const [chatRooms, setChatRooms]   = useState([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
 
-  const [messages, setMessages]           = useState([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
+  /* ───────────── messages state ───────────── */
+  const [messages, setMessages] = useState([]);          // oldest→newest
+  const [hasMore, setHasMore]   = useState(false);
+  const [nextBefore, setNextBefore] = useState(null);    // cursor
+  const [messagesLoading, setMessagesLoading]     = useState(false);
+  const [loadingOlder, setLoadingOlder]           = useState(false);
 
-  const [searchTerm, setSearchTerm]   = useState("");
+  /* ───────────── filters ───────────── */
+  const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
 
-  /* ─── HELPERS ─────────────────────────────────────── */
+  /* ───────────── rooms fetch ───────────── */
   const loadRooms = async () => {
     setRoomsLoading(true);
     try {
@@ -46,42 +53,78 @@ const ChatMonitorPage = () => {
     }
   };
 
-  const loadMessages = useCallback(async (roomId) => {
+  /* ───────────── messages fetch (page) ───────────── */
+  const fetchPage = async (roomId, before = null) => {
+    const { data } = await getMessagesPage(roomId, before, PAGE_SIZE);
+    /* backend returns newest→first  → flip */
+    return {
+      msgs      : data.messages.slice().reverse(),
+      hasMore   : data.hasMore,
+      nextBefore: data.nextBefore,
+    };
+  };
+
+  /** first load when room changes */
+  const loadInitialMessages = useCallback(async (roomId) => {
     if (!roomId) {
       setMessages([]);
+      setHasMore(false);
+      setNextBefore(null);
       return;
     }
     setMessagesLoading(true);
     try {
-      const { data } = await getMessages(roomId);
-      /* backend returns newest-first → flip to oldest-first */
-      setMessages(data.slice().reverse());
+      const { msgs, hasMore, nextBefore } = await fetchPage(roomId);
+      setMessages(msgs);
+      setHasMore(hasMore);
+      setNextBefore(nextBefore);
     } finally {
       setMessagesLoading(false);
     }
   }, []);
 
+  /** older page prepend */
+  const loadOlder = async () => {
+    if (!hasMore || loadingOlder || !selectedRoomId) return;
+
+    setLoadingOlder(true);
+    try {
+      const { msgs, hasMore: hm, nextBefore: nb } = await fetchPage(
+        selectedRoomId,
+        nextBefore
+      );
+      setMessages((prev) => [...msgs, ...prev]);
+      setHasMore(hm);
+      setNextBefore(nb);
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  /* ───────────── send ───────────── */
   const handleSend = async (text) => {
     if (!selectedRoomId) return;
     await sendMessage(selectedRoomId, text);
-    await loadMessages(selectedRoomId);     // refresh list
+    /* easiest: refresh last page */
+    await loadInitialMessages(selectedRoomId);
   };
 
-  /* ─── EFFECTS ─────────────────────────────────────── */
+  /* ───────────── effects ───────────── */
   useEffect(() => { loadRooms(); }, [statusFilter]);
-  useEffect(() => { loadMessages(selectedRoomId); }, [selectedRoomId, loadMessages]);
+  useEffect(() => { loadInitialMessages(selectedRoomId); },
+           [selectedRoomId, loadInitialMessages]);
 
-  /* ─── FILTERED ROOMS ─────────────────────────────── */
+  /* ───────────── rooms search filter ───────────── */
   const visibleRooms = chatRooms.filter((r) =>
     `${r.mentorFullName} ${r.studentFullName}`
       .toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
 
-  /* ─── RENDER ─────────────────────────────────────── */
+  /* ───────────── render ───────────── */
   return (
     <Box display="flex" flex={1} sx={{ minHeight: 0 }}>
-      {/* LEFT – ROOMS */}
+      {/* LEFT ─ Rooms list */}
       <Box
         width={320}
         flexShrink={0}
@@ -89,7 +132,6 @@ const ChatMonitorPage = () => {
         display="flex"
         flexDirection="column"
       >
-        {/* filters */}
         <Stack direction="row" spacing={1} p={1}>
           <TextField
             fullWidth
@@ -111,7 +153,7 @@ const ChatMonitorPage = () => {
         </Stack>
         <Divider />
         <Box flex={1} sx={{ overflowY: "auto" }}>
-          <AdminChatRoomList
+          <ChatRoomList
             chatRooms={visibleRooms}
             selectedId={selectedRoomId}
             onSelect={setSelectedRoomId}
@@ -120,22 +162,18 @@ const ChatMonitorPage = () => {
         </Box>
       </Box>
 
-      {/* RIGHT – MESSAGES */}
+      {/* RIGHT ─ Messages */}
       <Box display="flex" flexDirection="column" flex={1} sx={{ minHeight: 0 }}>
-        {/* scrollable list */}
-        <Box flex={1} sx={{ overflowY: "auto" }}>
-          <AdminChatMessageList
-            messages={messages}
-            loading={messagesLoading}
-          />
-        </Box>
-
-        {/* input (fixed) */}
-        <Divider />
-        <AdminChatMessageInput
-          disabled={!selectedRoomId}
-          onSend={handleSend}
+        <ChatMessageList
+          messages={messages}
+          loading={messagesLoading}
+          hasMore={hasMore}
+          loadingOlder={loadingOlder}
+          loadOlder={loadOlder}
         />
+
+        <Divider />
+        <ChatMessageInput disabled={!selectedRoomId} onSend={handleSend} />
       </Box>
     </Box>
   );

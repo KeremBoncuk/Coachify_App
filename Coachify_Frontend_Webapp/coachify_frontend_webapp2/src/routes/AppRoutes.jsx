@@ -8,10 +8,11 @@ import Layout from "../components/Layout";
 import AdminDashboard from "../pages/admin/Dashboard";
 import AdminStudentsPage from "../pages/admin/students/AdminStudentsPage";
 import AdminMentorsPage from "../pages/admin/mentors/AdminMentorsPage";
-import ChatMonitorPage from "../pages/admin/chat/ChatMonitorPage";   // ← NEW
+import ChatMonitorPage from "../pages/admin/chat/ChatMonitorPage";
 
 /* Mentor pages */
 import MentorDashboard from "../pages/mentor/Dashboard";
+import MentorChatPage from "../pages/mentor/chat/MentorChatPage";   // ← NEW
 
 const AppRoutes = () => (
   <Routes>
@@ -24,7 +25,6 @@ const AppRoutes = () => (
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
         <Route path="/admin/students" element={<AdminStudentsPage />} />
         <Route path="/admin/mentors" element={<AdminMentorsPage />} />
-        {/* NEW Chat Monitor route */}
         <Route path="/admin/chat-monitor" element={<ChatMonitorPage />} />
       </Route>
     </Route>
@@ -33,6 +33,7 @@ const AppRoutes = () => (
     <Route element={<PrivateRoute allowedRoles={["MENTOR"]} />}>
       <Route element={<Layout />}>
         <Route path="/mentor/dashboard" element={<MentorDashboard />} />
+        <Route path="/mentor/chat" element={<MentorChatPage />} /> {/* NEW */}
       </Route>
     </Route>
 

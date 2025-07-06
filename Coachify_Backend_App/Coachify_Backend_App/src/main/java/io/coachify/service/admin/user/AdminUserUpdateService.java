@@ -1,8 +1,8 @@
-package io.coachify.service.admin;
+package io.coachify.service.admin.user;
 
-import io.coachify.dto.admin.UpdateAdminRequest;
-import io.coachify.dto.admin.UpdateMentorRequest;
-import io.coachify.dto.admin.UpdateStudentRequest;
+import io.coachify.dto.admin.update.UpdateAdminRequest;
+import io.coachify.dto.admin.update.UpdateMentorRequest;
+import io.coachify.dto.admin.update.UpdateStudentRequest;
 import io.coachify.entity.user.Admin;
 import io.coachify.entity.user.Mentor;
 import io.coachify.entity.user.Student;
@@ -16,7 +16,6 @@ import lombok.RequiredArgsConstructor;
 import org.bson.types.ObjectId;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -47,11 +46,7 @@ public class AdminUserUpdateService {
     student.setEmail(encryptionUtil.encrypt(dto.getEmail()));
     student.setPhoneNumber(encryptionUtil.encrypt(dto.getPhoneNumber()));
 
-    if (dto.getAssignedMentor() != null) {
-      student.setAssignedMentor(new ObjectId(dto.getAssignedMentor()));
-    } else {
-      student.setAssignedMentor(null);
-    }
+    // Removed assignedMentor update here to enforce mentor assignment via dedicated endpoint only
 
     student.setPurchaseDate(dto.getPurchaseDate());
     student.setSubscriptionStartDate(dto.getSubscriptionStartDate());
@@ -90,13 +85,6 @@ public class AdminUserUpdateService {
     mentor.setBirthDate(dto.getBirthDate());
     mentor.setIban(dto.getIban());
     mentor.setNotes(dto.getNotes());
-
-    if (dto.getAssignedStudents() != null) {
-      mentor.setAssignedStudents(dto.getAssignedStudents().stream().map(ObjectId::new).toList());
-    } else {
-      mentor.setAssignedStudents(List.of());
-    }
-
     mentor.setActive(dto.isActive());
     mentor.setAbandonmentDate(dto.getAbandonmentDate());
 
