@@ -23,4 +23,14 @@ export const getMessagesPage = (chatRoomId, before = null, limit = 20) =>
     params: { chatRoomId, before, limit },
   });
 
+/* ─────────────── Send message ─────────────── */
 
+// POST /admin/chat/send-message
+//   body  : { text, mediaUrls }
+//   params: { chatRoomId }
+export const sendMessage = (chatRoomId, text, mediaUrls = []) =>
+  axios.post(
+    "/admin/chat/send-message",
+    { text, mediaUrls },
+    { params: { chatRoomId } }
+  );

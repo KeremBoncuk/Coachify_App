@@ -16,7 +16,14 @@ export const getPaginatedMessages = (
     params: { chatRoomId, before, limit },
   });
 
+/* ───────────── Send ───────────── */
 
+export const sendMessage = (chatRoomId, text, mediaUrls = []) =>
+  axios.post("/mentor/chat/send-message", {
+    chatRoomId,
+    text,
+    mediaUrls,
+  });
 
 /* ───────────── Mark as seen ───────────── */
 

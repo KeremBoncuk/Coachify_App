@@ -13,9 +13,9 @@ import ChatMessageInput from "./ChatMessageInput";
 import {
   getActiveChatRooms,
   getPaginatedMessages,
+  sendMessage,
   markMessagesAsSeen,
 } from "../../../api/mentorChat";
-import { useWebSocket } from '../../../hooks/useWebSocket';
 import { getStudentById } from "../../../api/adminUsers";
 
 const PAGE_SIZE = 20;
@@ -86,17 +86,7 @@ const MentorChatPage = () => {
         setHasMore(hasMore);
         setNextBefore(nextBefore);
 
-        // Mark messages as seen up to the latest message received
-        const latestMessageTime = msgs.length > 0 ? msgs[msgs.length - 1].sentAt : new Date().toISOString();
-        await markMessagesAsSeen(roomId, latestMessageTime);
-
-        // Update local state to reflect messages as seen by mentor
-        setMessages(currentMsgs =>
-          currentMsgs.map(msg => ({
-            ...msg,
-            seenStatus: { ...msg.seenStatus, seenByMentor: true },
-          }))
-        );
+        await markMessagesAsSeen(roomId, new Date().toISOString());
       } finally {
         setMessagesLoading(false);
       }
@@ -125,21 +115,10 @@ const MentorChatPage = () => {
     }
   };
 
-  /* ───────────── WebSocket ───────────── */
-  const { sendMessage: sendWsMessage } = useWebSocket(
-    selectedRoomId ? `/topic/chat/${selectedRoomId}` : null,
-    useCallback((newMessage) => {
-      setMessages((prev) => [...prev, newMessage]);
-    }, [])
-  );
-
   const handleSend = async (text) => {
     if (!selectedRoomId) return;
-    sendWsMessage("/app/chat.sendMessage", {
-      chatRoomId: selectedRoomId,
-      text,
-      mediaUrls: [],
-    });
+    await sendMessage(selectedRoomId, text);
+    await loadInitialMessages(selectedRoomId);
   };
 
   /* effects */

@@ -27,7 +27,7 @@ public class ChatMessageMentorService {
   private final StudentRepository     studentRepo;   // ✅ added to fetch student names
 
   /* 1 ─ SEND */
-  public ChatMessage sendMessageByMentor(ObjectId mentorId, MentorSendMessageRequest req) {
+  public void sendMessageByMentor(ObjectId mentorId, MentorSendMessageRequest req) {
 
     Mentor mentor = mentorRepo.findById(mentorId)
       .orElseThrow(() -> new IllegalArgumentException("Mentor not found"));
@@ -53,7 +53,7 @@ public class ChatMessageMentorService {
     m.setSentAt(Instant.now());
     m.setSeenStatus(new SeenStatus(false, true));         // mentor sees own
 
-    return msgRepo.save(m);
+    msgRepo.save(m);
   }
 
   /* 2 ─ ACTIVE ROOMS (with student full name) */

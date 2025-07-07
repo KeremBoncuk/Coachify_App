@@ -24,7 +24,7 @@ public class ChatMessageStudentService {
   private final StudentRepository     studentRepo;
 
   /* 1 ─ SEND */
-  public ChatMessage sendMessageByStudent(ObjectId studentId, StudentSendMessageRequest req) {
+  public void sendMessageByStudent(ObjectId studentId, StudentSendMessageRequest req) {
 
     Student student = studentRepo.findById(studentId)
       .orElseThrow(() -> new IllegalArgumentException("Student not found"));
@@ -50,7 +50,7 @@ public class ChatMessageStudentService {
     m.setSentAt(Instant.now());
     m.setSeenStatus(new SeenStatus(true, false));      // student sees own message
 
-    return msgRepo.save(m);
+    msgRepo.save(m);
   }
 
   /* 2 ─ ACTIVE ROOMS */

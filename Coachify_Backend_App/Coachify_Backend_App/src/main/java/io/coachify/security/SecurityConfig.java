@@ -32,7 +32,6 @@ public class SecurityConfig {
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/auth/login").permitAll()
         .requestMatchers("auth/logout", "auth/validate-token").authenticated()
-        .requestMatchers("/ws/**").permitAll() // Allow WebSocket connections
         .requestMatchers("/student/**").hasRole("STUDENT")
         .requestMatchers("/mentor/**").hasRole("MENTOR")
         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -46,9 +45,7 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
-    // TODO: For production, replace "http://localhost:3000" with your actual frontend domain(s).
-    // Example: config.setAllowedOrigins(List.of("https://your-production-domain.com"));
-    config.setAllowedOrigins(List.of("http://localhost:3000"));
+    config.setAllowedOrigins(List.of("http://localhost:3000")); // Frontend dev server
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
     config.setAllowedHeaders(List.of("*")); // Accept all headers
     config.setAllowCredentials(true); // Needed if frontend ever uses cookies or credentials

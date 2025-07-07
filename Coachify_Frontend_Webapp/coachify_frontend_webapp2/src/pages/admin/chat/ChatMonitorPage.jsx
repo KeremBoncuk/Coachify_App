@@ -16,8 +16,8 @@ import ChatMessageInput from "./ChatMessageInput";
 import {
   getChatRooms,
   getMessagesPage,
+  sendMessage,
 } from "../../../api/adminChat";
-import { useWebSocket } from '../../../hooks/useWebSocket';
 
 const PAGE_SIZE = 20;
 
@@ -101,22 +101,12 @@ const ChatMonitorPage = () => {
     }
   };
 
-  /* ───────────── WebSocket ───────────── */
-  const { sendMessage: sendWsMessage } = useWebSocket(
-    selectedRoomId ? `/topic/chat/${selectedRoomId}` : null,
-    useCallback((newMessage) => {
-      setMessages((prev) => [...prev, newMessage]);
-    }, [])
-  );
-
   /* ───────────── send ───────────── */
   const handleSend = async (text) => {
     if (!selectedRoomId) return;
-    sendWsMessage("/app/chat.sendMessage", {
-      chatRoomId: selectedRoomId,
-      text,
-      mediaUrls: [],
-    });
+    await sendMessage(selectedRoomId, text);
+    /* easiest: refresh last page */
+    await loadInitialMessages(selectedRoomId);
   };
 
   /* ───────────── effects ───────────── */

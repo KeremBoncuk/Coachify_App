@@ -39,5 +39,15 @@ public class ChatMessageAdminController {
     return chatService.getPaginatedMessages(new ObjectId(chatRoomId), before, limit);
   }
 
-  
+  /* send (unchanged) */
+  @PostMapping("/send-message")
+  @ResponseStatus(HttpStatus.CREATED)
+  public AdminChatMessageResponse sendMessage(
+    @RequestParam String chatRoomId,
+    @RequestBody @Valid AdminSendMessageRequest request,
+    @AuthenticationPrincipal CustomPrincipal principal) {
+
+    return chatService.sendMessage(
+      new ObjectId(chatRoomId), request, principal.getUserId());
+  }
 }

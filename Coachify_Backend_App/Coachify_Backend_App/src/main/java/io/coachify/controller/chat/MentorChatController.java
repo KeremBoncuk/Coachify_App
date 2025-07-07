@@ -23,7 +23,15 @@ public class MentorChatController {
 
   private final ChatMessageMentorService chatService;
 
-  
+  /* 1 ─ SEND */
+  @PostMapping("/send-message")
+  public ResponseEntity<Void> send(
+    @AuthenticationPrincipal CustomPrincipal p,
+    @RequestBody @Valid MentorSendMessageRequest req) {
+
+    chatService.sendMessageByMentor(p.getUserId(), req);
+    return ResponseEntity.ok().build();
+  }
 
   /* 2 ─ ACTIVE ROOMS */
   @GetMapping("/rooms")

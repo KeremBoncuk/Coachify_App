@@ -69,7 +69,6 @@ const ChatMessageList = ({
     (async () => {
       try {
         const tasks = Object.entries(toFetch).map(([id, role]) => {
-          console.log(`Fetching name for ID: ${id}, Role: ${role}`); // Added log
           if (role === "MENTOR")  return getMentorById(id).then((d) => ({ id, name: d.fullName }));
           if (role === "STUDENT") return getStudentById(id).then((d) => ({ id, name: d.fullName }));
           return getAdminById(id).then((d) => ({ id, name: d.fullName }));
@@ -109,16 +108,11 @@ const ChatMessageList = ({
     }
   }, [loadingOlder]);
 
-  /* ── scroll to bottom after first load / sending / new message ── */
+  /* ── scroll to bottom after first load / sending ── */
   useEffect(() => {
-    if (!loading && bottomRef.current) {
-      const { scrollHeight, clientHeight, scrollTop } = containerRef.current;
-      // Only auto-scroll if already at the bottom or very close to it
-      if (scrollHeight - scrollTop <= clientHeight + 200) { // 200px threshold
-        bottomRef.current.scrollIntoView({ behavior: "smooth" });
-      }
-    }
-  }, [loading, messages]);
+    if (!loading && bottomRef.current)
+      bottomRef.current.scrollIntoView({ behavior: "auto" });
+  }, [loading]);
 
   /* ── sub-components ── */
   const DateBubble = ({ label }) => (

@@ -61,9 +61,9 @@ public class ChatMessageAdminService {
   }
 
   /* ───────────────────────── sendMessage (unchanged) ───────────────────────── */
-  public ChatMessage sendMessage(ObjectId roomId,
-                                 AdminSendMessageRequest req,
-                                 ObjectId adminId) {
+  public AdminChatMessageResponse sendMessage(ObjectId roomId,
+                                              AdminSendMessageRequest req,
+                                              ObjectId adminId) {
 
     ChatRoom room = roomRepo.findById(roomId)
       .orElseThrow(() -> new NotFoundException("Chat room not found"));
@@ -88,7 +88,7 @@ public class ChatMessageAdminService {
     m.setSentAt(Instant.now());
     m.setSeenStatus(new SeenStatus(false, false));
 
-    return msgRepo.save(m);
+    return toDto(msgRepo.save(m));
   }
 
   /* ───────────────────────── helpers ───────────────────────── */
