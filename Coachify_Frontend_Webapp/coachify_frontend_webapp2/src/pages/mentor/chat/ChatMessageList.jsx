@@ -81,7 +81,7 @@ const ChatMessageList = ({
           sx={{
             ml: isMine ? "auto" : 0,
             mr: isMine ? 0 : "auto",
-            bgcolor: isMine ? "primary.light" : "grey.200",
+            bgcolor: isMine ? "primary.light" : (theme) => theme.palette.mode === 'dark' ? 'grey.700' : 'grey.200',
             p: 1.2,
             borderRadius: 2,
             maxWidth: "75%",

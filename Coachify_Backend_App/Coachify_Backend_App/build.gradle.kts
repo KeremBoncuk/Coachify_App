@@ -29,8 +29,6 @@ dependencies {
   // Spring Security support
   implementation("org.springframework.boot:spring-boot-starter-security")
 
-  // WebSocket + STOMP support (new addition)
-  implementation("org.springframework.boot:spring-boot-starter-websocket")
 
   // JWT: API + impl + Jackson integration
   implementation("io.jsonwebtoken:jjwt-api:0.11.5")

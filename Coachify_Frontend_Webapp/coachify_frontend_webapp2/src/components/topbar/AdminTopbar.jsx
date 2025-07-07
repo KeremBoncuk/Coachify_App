@@ -11,11 +11,16 @@
   import MenuIcon from "@mui/icons-material/Menu";
   import { useNavigate } from "react-router-dom";
   import { logout } from "../../auth/logout";
+  import { useContext } from "react";
+  import { ThemeContext } from "../../theme/ThemeContext";
+  import { Brightness4, Brightness7 } from "@mui/icons-material";
 
   const AdminTopbar = ({ onMenuClick }) => {
     const theme   = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down("md"));
     const navigate = useNavigate();
+    const { toggleTheme, themeMode } = useContext(ThemeContext);
+
 
     const handleLogout = async () => {
       await logout(navigate);
@@ -33,6 +38,9 @@
             Admin Panel – Coachify
           </Typography>
           <Box>
+            <IconButton onClick={toggleTheme} color="inherit">
+              {themeMode === 'light' ? <Brightness4 /> : <Brightness7 />}
+            </IconButton>
             <Button color="inherit" onClick={handleLogout}>
               Logout
             </Button>
