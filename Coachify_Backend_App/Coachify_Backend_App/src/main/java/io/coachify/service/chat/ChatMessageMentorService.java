@@ -2,8 +2,10 @@ package io.coachify.service.chat;
 
 import io.coachify.dto.chat.mentor.*;
 import io.coachify.entity.chat.*;
+import io.coachify.entity.user.Admin;
 import io.coachify.entity.user.Mentor;
 import io.coachify.entity.user.Student;
+import io.coachify.repo.AdminRepository;
 import io.coachify.repo.MentorRepository;
 import io.coachify.repo.StudentRepository;
 import io.coachify.repo.chat.ChatMessageRepository;
@@ -25,8 +27,9 @@ public class ChatMessageMentorService {
   private final ChatMessageRepository msgRepo;
   private final MentorRepository      mentorRepo;
   private final StudentRepository     studentRepo;
+  private final AdminRepository       adminRepo;     // ✅ added
 
-  /* 1 ─ SEND */
+  /* 1 ─ SEND (unchanged) */
   public void sendMessageByMentor(ObjectId mentorId, MentorSendMessageRequest req) {
 
     Mentor mentor = mentorRepo.findById(mentorId)
@@ -56,7 +59,7 @@ public class ChatMessageMentorService {
     msgRepo.save(m);
   }
 
-  /* 2 ─ ACTIVE ROOMS (with student full name) */
+  /* 2 ─ ACTIVE ROOMS (unchanged) */
   public List<MentorChatRoomDTO> getActiveChatRoomsForMentor(ObjectId mentorId) {
     return roomRepo.findByMentorIdAndIsActiveTrue(mentorId).stream()
       .map(r -> {
@@ -74,7 +77,7 @@ public class ChatMessageMentorService {
       .toList();
   }
 
-  /* 3 ─ PAGINATED (cursor exclusive) */
+  /* 3 ─ PAGINATED */
   public MentorChatMessagesResponse getMessages(
     ObjectId mentorId, ObjectId chatRoomId, Instant before, int limit) {
 
@@ -99,7 +102,7 @@ public class ChatMessageMentorService {
     return new MentorChatMessagesResponse(dto, nextBefore, hasMore);
   }
 
-  /* 4 ─ FULL DUMP (ascending) */
+  /* 4 ─ FULL DUMP */
   public List<MentorChatMessageDTO> getAllMessages(ObjectId mentorId, ObjectId chatRoomId) {
     ChatRoom room = roomRepo.findByIdAndIsActiveTrue(chatRoomId)
       .orElseThrow(() -> new IllegalArgumentException("Chat room not found / inactive"));
@@ -111,9 +114,8 @@ public class ChatMessageMentorService {
       .toList();
   }
 
-  /* 5 ─ MARK AS SEEN */
+  /* 5 ─ MARK AS SEEN (unchanged) */
   public void markMessagesAsSeen(ObjectId mentorId, ObjectId chatRoomId, Instant until) {
-
     ChatRoom room = roomRepo.findByIdAndIsActiveTrue(chatRoomId)
       .orElseThrow(() -> new IllegalArgumentException("Chat room not found / inactive"));
     if (!room.getMentorId().equals(mentorId))
@@ -131,26 +133,27 @@ public class ChatMessageMentorService {
     msgRepo.saveAll(unseen);
   }
 
-  /* helper ─ now includes sender full name */
+  /* helper: map ChatMessage → DTO with full name for ALL roles */
   private MentorChatMessageDTO toDto(ChatMessage m) {
     String senderFullName;
-    if ("STUDENT".equals(m.getSenderRole())) {
-      senderFullName = studentRepo.findById(m.getSenderId())
+    switch (m.getSenderRole()) {
+      case "STUDENT" -> senderFullName = studentRepo.findById(m.getSenderId())
         .map(Student::getFullName)
         .orElse("(unknown student)");
-    } else if ("MENTOR".equals(m.getSenderRole())) {
-      senderFullName = mentorRepo.findById(m.getSenderId())
+      case "MENTOR"  -> senderFullName = mentorRepo.findById(m.getSenderId())
         .map(Mentor::getFullName)
         .orElse("(unknown mentor)");
-    } else {
-      senderFullName = "(unknown)";
+      case "ADMIN"   -> senderFullName = adminRepo.findById(m.getSenderId())
+        .map(Admin::getFullName)
+        .orElse("(unknown admin)");
+      default        -> senderFullName = "(unknown)";
     }
 
     return new MentorChatMessageDTO(
       m.getId().toHexString(),
       m.getSenderId().toHexString(),
       m.getSenderRole(),
-      senderFullName,  // ✅ Inject full name here
+      senderFullName,
       m.getText(),
       m.getMediaUrls(),
       m.getSeenStatus(),

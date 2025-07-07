@@ -7,7 +7,7 @@ import {
   MenuItem,
   Stack,
 } from "@mui/material";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 import ChatRoomList     from "./ChatRoomList";
 import ChatMessageList  from "./ChatMessageList";
@@ -19,33 +19,36 @@ import {
   sendMessage,
 } from "../../../api/adminChat";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE     = 20;
+const POLL_INTERVAL = 2000; // ms
 
 const ChatMonitorPage = () => {
-  /* ───────────── rooms state ───────────── */
-  const [chatRooms, setChatRooms]   = useState([]);
+  /* rooms */
+  const [chatRooms, setChatRooms] = useState([]);
   const [roomsLoading, setRoomsLoading] = useState(true);
   const [selectedRoomId, setSelectedRoomId] = useState(null);
 
-  /* ───────────── messages state ───────────── */
-  const [messages, setMessages] = useState([]);          // oldest→newest
+  /* messages */
+  const [messages, setMessages] = useState([]);
   const [hasMore, setHasMore]   = useState(false);
-  const [nextBefore, setNextBefore] = useState(null);    // cursor
-  const [messagesLoading, setMessagesLoading]     = useState(false);
-  const [loadingOlder, setLoadingOlder]           = useState(false);
+  const [nextBefore, setNextBefore] = useState(null);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [loadingOlder, setLoadingOlder]       = useState(false);
 
-  /* ───────────── filters ───────────── */
-  const [searchTerm, setSearchTerm] = useState("");
+  /* filters */
+  const [searchTerm,  setSearchTerm]  = useState("");
   const [statusFilter, setStatusFilter] = useState("ACTIVE");
 
-  /* ───────────── rooms fetch ───────────── */
+  const containerRef = useRef(null);
+  const pollingRef   = useRef(null);
+
+  /* load rooms */
   const loadRooms = async () => {
     setRoomsLoading(true);
     try {
       const params = {};
       if (statusFilter === "ACTIVE")   params.onlyActive = true;
       if (statusFilter === "INACTIVE") params.onlyActive = false;
-
       const { data } = await getChatRooms(params);
       setChatRooms(data);
     } finally {
@@ -53,10 +56,9 @@ const ChatMonitorPage = () => {
     }
   };
 
-  /* ───────────── messages fetch (page) ───────────── */
+  /* fetch one page (oldest→newest) */
   const fetchPage = async (roomId, before = null) => {
     const { data } = await getMessagesPage(roomId, before, PAGE_SIZE);
-    /* backend returns newest→first  → flip */
     return {
       msgs      : data.messages.slice().reverse(),
       hasMore   : data.hasMore,
@@ -64,12 +66,10 @@ const ChatMonitorPage = () => {
     };
   };
 
-  /** first load when room changes */
+  /* first load */
   const loadInitialMessages = useCallback(async (roomId) => {
     if (!roomId) {
-      setMessages([]);
-      setHasMore(false);
-      setNextBefore(null);
+      setMessages([]); setHasMore(false); setNextBefore(null);
       return;
     }
     setMessagesLoading(true);
@@ -78,72 +78,87 @@ const ChatMonitorPage = () => {
       setMessages(msgs);
       setHasMore(hasMore);
       setNextBefore(nextBefore);
-    } finally {
-      setMessagesLoading(false);
-    }
+    } finally { setMessagesLoading(false); }
   }, []);
 
-  /** older page prepend */
+  /* prepend older */
   const loadOlder = async () => {
     if (!hasMore || loadingOlder || !selectedRoomId) return;
-
     setLoadingOlder(true);
     try {
-      const { msgs, hasMore: hm, nextBefore: nb } = await fetchPage(
-        selectedRoomId,
-        nextBefore
-      );
-      setMessages((prev) => [...msgs, ...prev]);
+      const { msgs, hasMore: hm, nextBefore: nb } =
+        await fetchPage(selectedRoomId, nextBefore);
+      setMessages(prev => [...msgs, ...prev]);
       setHasMore(hm);
       setNextBefore(nb);
-    } finally {
-      setLoadingOlder(false);
-    }
+    } finally { setLoadingOlder(false); }
   };
 
-  /* ───────────── send ───────────── */
+  /* send */
   const handleSend = async (text) => {
     if (!selectedRoomId) return;
     await sendMessage(selectedRoomId, text);
-    /* easiest: refresh last page */
     await loadInitialMessages(selectedRoomId);
   };
 
-  /* ───────────── effects ───────────── */
+  /* polling */
+  useEffect(() => {
+    if (!selectedRoomId) return;
+    const poll = async () => {
+      const { msgs } = await fetchPage(selectedRoomId);
+      setMessages(prev => {
+        const last = prev.length ? prev[prev.length - 1].sentAt : null;
+        const fresh = msgs.filter(m => !last || new Date(m.sentAt) > new Date(last));
+        if (fresh.length === 0) return prev;
+
+        const nearBottom =
+          containerRef.current &&
+          containerRef.current.scrollHeight -
+          containerRef.current.scrollTop -
+          containerRef.current.clientHeight < 100;
+
+        const next = [...prev, ...fresh];
+        if (nearBottom) {
+          setTimeout(() => {
+            containerRef.current.scrollTop = containerRef.current.scrollHeight;
+          }, 50);
+        }
+        return next;
+      });
+    };
+    pollingRef.current = setInterval(poll, POLL_INTERVAL);
+    return () => clearInterval(pollingRef.current);
+  }, [selectedRoomId]);
+
+  /* effects */
   useEffect(() => { loadRooms(); }, [statusFilter]);
   useEffect(() => { loadInitialMessages(selectedRoomId); },
            [selectedRoomId, loadInitialMessages]);
 
-  /* ───────────── rooms search filter ───────────── */
-  const visibleRooms = chatRooms.filter((r) =>
-    `${r.mentorFullName} ${r.studentFullName}`
-      .toLowerCase()
+  /* filter rooms */
+  const visibleRooms = chatRooms.filter(r =>
+    `${r.mentorFullName} ${r.studentFullName}`.toLowerCase()
       .includes(searchTerm.toLowerCase())
   );
 
-  /* ───────────── render ───────────── */
+  /* render */
   return (
     <Box display="flex" flex={1} sx={{ minHeight: 0 }}>
-      {/* LEFT ─ Rooms list */}
+      {/* Rooms */}
       <Box
-        width={320}
-        flexShrink={0}
-        borderRight="1px solid #ddd"
-        display="flex"
-        flexDirection="column"
+        width={320} flexShrink={0} borderRight="1px solid #ddd"
+        display="flex" flexDirection="column"
       >
         <Stack direction="row" spacing={1} p={1}>
           <TextField
-            fullWidth
-            size="small"
-            placeholder="Search…"
+            fullWidth size="small" placeholder="Search…"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
           />
           <FormControl size="small" sx={{ minWidth: 110 }}>
             <Select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={e => setStatusFilter(e.target.value)}
             >
               <MenuItem value="ACTIVE">Active</MenuItem>
               <MenuItem value="INACTIVE">Inactive</MenuItem>
@@ -162,7 +177,7 @@ const ChatMonitorPage = () => {
         </Box>
       </Box>
 
-      {/* RIGHT ─ Messages */}
+      {/* Messages */}
       <Box display="flex" flexDirection="column" flex={1} sx={{ minHeight: 0 }}>
         <ChatMessageList
           messages={messages}
@@ -170,8 +185,8 @@ const ChatMonitorPage = () => {
           hasMore={hasMore}
           loadingOlder={loadingOlder}
           loadOlder={loadOlder}
+          containerRef={containerRef}
         />
-
         <Divider />
         <ChatMessageInput disabled={!selectedRoomId} onSend={handleSend} />
       </Box>

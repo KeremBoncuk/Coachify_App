@@ -22,18 +22,15 @@ import {
 import { getUserIdFromToken } from "../../../auth/jwtUtils";
 import { CheckCircle, RadioButtonUnchecked } from "@mui/icons-material";
 
-/* ───────────────────────── helpers ───────────────────────── */
 const Sup = ({ children }) => (
   <sup style={{ fontSize: "0.7em", verticalAlign: "super" }}>{children}</sup>
 );
-
 const formatDateHeader = (iso) => {
   const d = dayjs(iso);
   if (dayjs().isSame(d, "day"))           return "Today";
   if (dayjs().subtract(1, "day").isSame(d,"day")) return "Yesterday";
   return d.format("DD MMM YYYY");
 };
-
 const SeenIcon = ({ seen }) =>
   seen ? (
     <CheckCircle fontSize="small" sx={{ color: "green" }} />
@@ -41,99 +38,77 @@ const SeenIcon = ({ seen }) =>
     <RadioButtonUnchecked fontSize="small" sx={{ color: "grey.500" }} />
   );
 
-/* ─────────────────────── component ─────────────────────── */
 const ChatMessageList = ({
   messages,
   loading,
   hasMore,
   loadingOlder,
   loadOlder,
+  containerRef,          // NEW
 }) => {
-  /* id → fullName cache */
   const [nameMap, setNameMap] = useState({});
   const currentUserId = useMemo(() => getUserIdFromToken(), []);
 
-  /* refs for scroll handling */
-  const containerRef = useRef(null);
-  const topSentinel  = useRef(null);
-  const bottomRef    = useRef(null);
+  const innerRef = containerRef || useRef(null);
+  const topSentinel = useRef(null);
+  const bottomRef   = useRef(null);
 
-  /* ── fetch missing names exactly once per unknown id ── */
+  /* fetch names (unchanged) */
   useEffect(() => {
     const toFetch = {};
     messages.forEach((m) => {
       if (!nameMap[m.senderId]) toFetch[m.senderId] = m.senderRole;
     });
     if (Object.keys(toFetch).length === 0) return;
-
     (async () => {
       try {
         const tasks = Object.entries(toFetch).map(([id, role]) => {
-          if (role === "MENTOR")  return getMentorById(id).then((d) => ({ id, name: d.fullName }));
-          if (role === "STUDENT") return getStudentById(id).then((d) => ({ id, name: d.fullName }));
-          return getAdminById(id).then((d) => ({ id, name: d.fullName }));
+          if (role === "MENTOR")  return getMentorById(id).then(d => ({ id, name: d.fullName }));
+          if (role === "STUDENT") return getStudentById(id).then(d => ({ id, name: d.fullName }));
+          return getAdminById(id).then(d => ({ id, name: d.fullName }));
         });
-        const resolved = await Promise.all(tasks);
-        const newMap = {};
-        resolved.forEach(({ id, name }) => (newMap[id] = name));
-        setNameMap((prev) => ({ ...prev, ...newMap }));
-      } catch (err) {
-        console.error("Name lookup failed:", err);
-      }
+        const res = await Promise.all(tasks);
+        const add = {};
+        res.forEach(({ id, name }) => (add[id] = name));
+        setNameMap(prev => ({ ...prev, ...add }));
+      } catch { /* ignore */ }
     })();
   }, [messages, nameMap]);
 
-  /* ── load older messages when the sentinel hits top ── */
+  /* sentinel */
   useEffect(() => {
     if (!topSentinel.current) return;
     const io = new IntersectionObserver(
       ([e]) => e.isIntersecting && loadOlder(),
-      { root: containerRef.current, threshold: 0 }
+      { root: innerRef.current, threshold: 0 }
     );
     io.observe(topSentinel.current);
     return () => io.disconnect();
   }, [loadOlder]);
 
-  /* ── keep scroll position while prepending ── */
+  /* maintain scroll offset */
   const prevHeight = useRef(0);
-  const prevLen    = useRef(messages.length);
+  const prevLen = useRef(messages.length);
   if (messages.length !== prevLen.current) {
-    prevHeight.current = containerRef.current?.scrollHeight || 0;
-    prevLen.current    = messages.length;
+    prevHeight.current = innerRef.current?.scrollHeight || 0;
+    prevLen.current = messages.length;
   }
   useLayoutEffect(() => {
-    if (loadingOlder && containerRef.current) {
-      const diff = containerRef.current.scrollHeight - prevHeight.current;
-      containerRef.current.scrollTop = diff;
+    if (loadingOlder && innerRef.current) {
+      const diff = innerRef.current.scrollHeight - prevHeight.current;
+      innerRef.current.scrollTop = diff;
     }
   }, [loadingOlder]);
 
-  /* ── scroll to bottom after first load / sending ── */
+  /* scroll to bottom on load */
   useEffect(() => {
     if (!loading && bottomRef.current)
       bottomRef.current.scrollIntoView({ behavior: "auto" });
   }, [loading]);
 
-  /* ── sub-components ── */
-  const DateBubble = ({ label }) => (
-    <Box display="flex" justifyContent="center" my={1}>
-      <Paper
-        elevation={0}
-        sx={{ bgcolor: "grey.300", px: 1.5, py: 0.2, borderRadius: 2 }}
-      >
-        <Typography variant="caption" color="text.secondary">
-          {label}
-        </Typography>
-      </Paper>
-    </Box>
-  );
-
   const MsgBubble = ({ m }) => {
     const isMine   = m.senderId === currentUserId;
-    const bubbleBg = isMine ? "primary.light" : "grey.200";
     const sender   = nameMap[m.senderId] || m.senderRole;
-
-    /* FORCE boolean with “!!” so strings like "true" work */
     const seenByStudent = !!m.seenStatus?.seenByStudent;
     const seenByMentor  = !!m.seenStatus?.seenByMentor;
 
@@ -144,7 +119,7 @@ const ChatMessageList = ({
           sx={{
             ml: isMine ? "auto" : 0,
             mr: isMine ? 0 : "auto",
-            bgcolor: bubbleBg,
+            bgcolor: isMine ? "primary.light" : "grey.200",
             p: 1.2,
             borderRadius: 2,
             maxWidth: "75%",
@@ -153,20 +128,14 @@ const ChatMessageList = ({
           <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
             {m.text}
           </Typography>
-
           <Box mt={0.5} display="flex" alignItems="center" gap={1}>
             <Typography variant="caption" color="text.secondary">
               {sender} <Sup>({m.senderRole.toLowerCase()})</Sup> · {formatTime(m.sentAt)}
             </Typography>
-
             <Box display="flex" alignItems="center" gap={0.5}>
-              <Typography variant="caption" color="text.secondary">
-                S:
-              </Typography>
+              <Typography variant="caption" color="text.secondary">S:</Typography>
               <SeenIcon seen={seenByStudent} />
-              <Typography variant="caption" color="text.secondary">
-                M:
-              </Typography>
+              <Typography variant="caption" color="text.secondary">M:</Typography>
               <SeenIcon seen={seenByMentor} />
             </Box>
           </Box>
@@ -175,10 +144,9 @@ const ChatMessageList = ({
     );
   };
 
-  /* ── main render ── */
   return (
     <Box
-      ref={containerRef}
+      ref={innerRef}
       flex={1}
       overflow="auto"
       display="flex"
@@ -197,29 +165,12 @@ const ChatMessageList = ({
       ) : (
         <List disablePadding sx={{ display: "flex", flexDirection: "column", gap: 1, p: 2 }}>
           <div ref={topSentinel} />
-
           {loadingOlder && (
             <Box display="flex" justifyContent="center" py={1}>
               <CircularProgress size={20} />
             </Box>
           )}
-
-          {(() => {
-            const out = [];
-            let lastDate = null;
-            messages.forEach((m) => {
-              const ymd = dayjs(m.sentAt).format("YYYY-MM-DD");
-              if (ymd !== lastDate) {
-                lastDate = ymd;
-                out.push(
-                  <DateBubble key={`date-${ymd}`} label={formatDateHeader(m.sentAt)} />
-                );
-              }
-              out.push(<MsgBubble key={m.messageId ?? m.id} m={m} />);
-            });
-            return out;
-          })()}
-
+          {messages.map(m => <MsgBubble key={m.id || m.messageId} m={m} />)}
           <div ref={bottomRef} />
         </List>
       )}
