@@ -9,18 +9,12 @@ import {
 import { DoneAll, Done } from "@mui/icons-material";
 import {
   useEffect,
-  useState,
   useMemo,
   useRef,
   useLayoutEffect,
 } from "react";
 import dayjs from "dayjs";
 import { formatTime } from "../../../utils/formatTime";
-import {
-  getMentorById,
-  getStudentById,
-  getAdminById,
-} from "../../../api/adminUsers";
 import { getUserIdFromToken } from "../../../auth/jwtUtils";
 
 const Sup = ({ children }) => (
@@ -34,11 +28,6 @@ const formatDateHeader = (iso) => {
   return d.format("DD MMM YYYY");
 };
 
-/**
- * Mentor Chat Message List (with universal seen indicator)
- * Props:
- *  • messages, loading, hasMore, loadingOlder, loadOlder
- */
 const ChatMessageList = ({
   messages,
   loading,
@@ -46,37 +35,11 @@ const ChatMessageList = ({
   loadingOlder,
   loadOlder,
 }) => {
-  const [nameMap, setNameMap] = useState({});
   const currentUserId = useMemo(() => getUserIdFromToken(), []);
 
   const containerRef = useRef(null);
   const topSentinel = useRef(null);
   const bottomRef = useRef(null);
-
-  /* fetch missing names */
-  useEffect(() => {
-    const need = {};
-    messages.forEach((m) => {
-      if (!nameMap[m.senderId]) need[m.senderId] = m.senderRole;
-    });
-    if (Object.keys(need).length === 0) return;
-
-    (async () => {
-      try {
-        const tasks = Object.entries(need).map(([id, role]) => {
-          if (role === "MENTOR")  return getMentorById(id).then((d) => ({ id, name: d.fullName }));
-          if (role === "STUDENT") return getStudentById(id).then((d) => ({ id, name: d.fullName }));
-          return getAdminById(id).then((d) => ({ id, name: d.fullName }));
-        });
-        const res = await Promise.all(tasks);
-        const add = {};
-        res.forEach(({ id, name }) => (add[id] = name));
-        setNameMap((prev) => ({ ...prev, ...add }));
-      } catch (e) {
-        console.error("Name lookup failed:", e);
-      }
-    })();
-  }, [messages, nameMap]);
 
   /* infinite-scroll ↑ */
   useEffect(() => {
@@ -123,10 +86,9 @@ const ChatMessageList = ({
   const MsgBubble = ({ m }) => {
     const isMine = m.senderId === currentUserId;
     const bg = isMine ? "primary.light" : "grey.200";
-    const senderName = nameMap[m.senderId] || m.senderRole;
     const meta = (
       <>
-        {senderName} <Sup>({m.senderRole.toLowerCase()})</Sup> · {formatTime(m.sentAt)}
+        {m.senderFullName} <Sup>({m.senderRole.toLowerCase()})</Sup> · {formatTime(m.sentAt)}
       </>
     );
 
@@ -201,7 +163,7 @@ const ChatMessageList = ({
                   <DateBubble key={`d-${d}`} label={formatDateHeader(m.sentAt)} />
                 );
               }
-              out.push(<MsgBubble key={m.id} m={m} />);
+              out.push(<MsgBubble key={m.id || m.messageId} m={m} />);
             });
             return out;
           })()}

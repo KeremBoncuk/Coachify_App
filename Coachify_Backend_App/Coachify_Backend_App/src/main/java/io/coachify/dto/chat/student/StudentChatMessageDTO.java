@@ -8,6 +8,7 @@ public record StudentChatMessageDTO(
   String id,
   String senderId,
   String senderRole,
+  String senderFullName,  // ✅ Added
   String text,
   List<String> mediaUrls,
   SeenStatus seenStatus,

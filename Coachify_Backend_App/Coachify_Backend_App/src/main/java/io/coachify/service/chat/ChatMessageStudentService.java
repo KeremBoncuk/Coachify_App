@@ -2,7 +2,9 @@ package io.coachify.service.chat;
 
 import io.coachify.dto.chat.student.*;
 import io.coachify.entity.chat.*;
+import io.coachify.entity.user.Mentor;
 import io.coachify.entity.user.Student;
+import io.coachify.repo.MentorRepository;
 import io.coachify.repo.StudentRepository;
 import io.coachify.repo.chat.ChatMessageRepository;
 import io.coachify.repo.chat.ChatRoomRepository;
@@ -22,6 +24,7 @@ public class ChatMessageStudentService {
   private final ChatRoomRepository    roomRepo;
   private final ChatMessageRepository msgRepo;
   private final StudentRepository     studentRepo;
+  private final MentorRepository      mentorRepo;
 
   /* 1 ─ SEND */
   public void sendMessageByStudent(ObjectId studentId, StudentSendMessageRequest req) {
@@ -48,7 +51,7 @@ public class ChatMessageStudentService {
     m.setText(req.text());
     m.setMediaUrls(noMedia ? List.of() : req.mediaUrls());
     m.setSentAt(Instant.now());
-    m.setSeenStatus(new SeenStatus(true, false));      // student sees own message
+    m.setSeenStatus(new SeenStatus(true, false));  // student sees own message
 
     msgRepo.save(m);
   }
@@ -122,12 +125,26 @@ public class ChatMessageStudentService {
     msgRepo.saveAll(unseen);
   }
 
-  /* helper */
+  /* helper ─ now includes sender full name */
   private StudentChatMessageDTO toDto(ChatMessage m) {
+    String senderFullName;
+    if ("MENTOR".equals(m.getSenderRole())) {
+      senderFullName = mentorRepo.findById(m.getSenderId())
+        .map(Mentor::getFullName)
+        .orElse("(unknown mentor)");
+    } else if ("STUDENT".equals(m.getSenderRole())) {
+      senderFullName = studentRepo.findById(m.getSenderId())
+        .map(Student::getFullName)
+        .orElse("(unknown student)");
+    } else {
+      senderFullName = "(unknown)";
+    }
+
     return new StudentChatMessageDTO(
       m.getId().toHexString(),
       m.getSenderId().toHexString(),
       m.getSenderRole(),
+      senderFullName,  // ✅ Injected full name here
       m.getText(),
       m.getMediaUrls(),
       m.getSeenStatus(),

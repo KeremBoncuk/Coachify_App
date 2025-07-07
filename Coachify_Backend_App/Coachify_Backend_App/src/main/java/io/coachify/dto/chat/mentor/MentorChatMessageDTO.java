@@ -9,9 +9,11 @@ public record MentorChatMessageDTO(
   String messageId,
   String senderId,
   String senderRole,
+  String senderFullName,  // ✅ New field
   String text,
   List<String> mediaUrls,
   SeenStatus seenStatus,
   Instant seenAt,
   Instant sentAt
 ) {}
+

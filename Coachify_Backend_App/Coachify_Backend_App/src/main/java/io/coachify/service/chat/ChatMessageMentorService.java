@@ -24,7 +24,7 @@ public class ChatMessageMentorService {
   private final ChatRoomRepository    roomRepo;
   private final ChatMessageRepository msgRepo;
   private final MentorRepository      mentorRepo;
-  private final StudentRepository     studentRepo;   // ✅ added to fetch student names
+  private final StudentRepository     studentRepo;
 
   /* 1 ─ SEND */
   public void sendMessageByMentor(ObjectId mentorId, MentorSendMessageRequest req) {
@@ -51,7 +51,7 @@ public class ChatMessageMentorService {
     m.setText(req.text());
     m.setMediaUrls(noMedia ? List.of() : req.mediaUrls());
     m.setSentAt(Instant.now());
-    m.setSeenStatus(new SeenStatus(false, true));         // mentor sees own
+    m.setSeenStatus(new SeenStatus(false, true));  // mentor sees own
 
     msgRepo.save(m);
   }
@@ -67,7 +67,7 @@ public class ChatMessageMentorService {
           r.getId().toHexString(),
           r.getStudentId().toHexString(),
           r.getMentorId().toHexString(),
-          studentName,                        // ✅ inject full name here
+          studentName,
           r.getCreatedAt(),
           r.isActive());
       })
@@ -85,7 +85,7 @@ public class ChatMessageMentorService {
 
     if (limit < 1 || limit > 100) limit = 20;
 
-    var page = PageRequest.of(0, limit + 1);   // ask one extra
+    var page = PageRequest.of(0, limit + 1);
     List<ChatMessage> raw = (before == null)
       ? msgRepo.findByChatRoomIdOrderBySentAtDesc(chatRoomId, page)
       : msgRepo.findByChatRoomIdAndSentAtBeforeOrderBySentAtDesc(chatRoomId, before, page);
@@ -131,12 +131,26 @@ public class ChatMessageMentorService {
     msgRepo.saveAll(unseen);
   }
 
-  /* helper */
+  /* helper ─ now includes sender full name */
   private MentorChatMessageDTO toDto(ChatMessage m) {
+    String senderFullName;
+    if ("STUDENT".equals(m.getSenderRole())) {
+      senderFullName = studentRepo.findById(m.getSenderId())
+        .map(Student::getFullName)
+        .orElse("(unknown student)");
+    } else if ("MENTOR".equals(m.getSenderRole())) {
+      senderFullName = mentorRepo.findById(m.getSenderId())
+        .map(Mentor::getFullName)
+        .orElse("(unknown mentor)");
+    } else {
+      senderFullName = "(unknown)";
+    }
+
     return new MentorChatMessageDTO(
       m.getId().toHexString(),
       m.getSenderId().toHexString(),
       m.getSenderRole(),
+      senderFullName,  // ✅ Inject full name here
       m.getText(),
       m.getMediaUrls(),
       m.getSeenStatus(),
