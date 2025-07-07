@@ -1,10 +1,13 @@
 package io.coachify.service.chat;
 
-import io.coachify.dto.chat.ChatRoomAdminDTO;
+import io.coachify.dto.chat.admin.AdminChatRoomResponse;
+import io.coachify.dto.chat.admin.CreateChatRoomRequest;
+import io.coachify.dto.chat.admin.UpdateChatRoomRequest;
 import io.coachify.entity.chat.ChatRoom;
 import io.coachify.entity.user.Mentor;
 import io.coachify.entity.user.Student;
 import io.coachify.exception.BadRequestException;
+import io.coachify.exception.ConflictException;
 import io.coachify.exception.NotFoundException;
 import io.coachify.repo.MentorRepository;
 import io.coachify.repo.StudentRepository;
@@ -14,135 +17,103 @@ import org.bson.types.ObjectId;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class ChatRoomAdminService {
 
-  private final ChatRoomRepository roomRepo;
-  private final StudentRepository  studentRepo;
-  private final MentorRepository   mentorRepo;
+  private final ChatRoomRepository chatRoomRepository;
+  private final StudentRepository studentRepository;
+  private final MentorRepository mentorRepository;
 
-  /* ──────────────── Create ─────────────────────────────── */
-  public ChatRoomAdminDTO createRoom(String studentIdHex, String mentorIdHex) {
-
-    ObjectId studentId = new ObjectId(studentIdHex);
-    ObjectId mentorId  = new ObjectId(mentorIdHex);
-
-    Student student = studentRepo.findById(studentId)
-            .orElseThrow(() -> new NotFoundException("Student not found"));
-    Mentor mentor = mentorRepo.findById(mentorId)
-            .orElseThrow(() -> new NotFoundException("Mentor not found"));
-
-    if (!mentorId.equals(student.getAssignedMentor()))
-      throw new BadRequestException("Mentor not assigned to this student");
-
-    roomRepo.findByStudentIdAndMentorId(studentId, mentorId)
-            .ifPresent(r -> { throw new BadRequestException("Chat room already exists"); });
-
-    ChatRoom room = new ChatRoom();
-    room.setStudentId(studentId);
-    room.setMentorId(mentorId);
-    room.setActive(true);
-    room.setCreatedAt(Instant.now());
-
-    return toDto(roomRepo.save(room), student, mentor);
-  }
-
-  /* ──────────────── Update active flag ─────────────────── */
-  public void setActive(String roomIdHex, boolean active) {
-    ChatRoom room = roomRepo.findById(new ObjectId(roomIdHex))
-            .orElseThrow(() -> new NotFoundException("Room not found"));
-    room.setActive(active);
-    roomRepo.save(room);
-  }
-
-  /* ──────────────── List / filter ──────────────────────── */
-  public List<ChatRoomAdminDTO> list(Boolean onlyActive,
-                                     String studentIdHex,
-                                     String mentorIdHex) {
+  public List<AdminChatRoomResponse> getChatRooms(Boolean onlyActive, String studentId, String mentorId) {
+    if (studentId != null && mentorId != null) {
+      throw new BadRequestException("Only one of studentId or mentorId can be provided.");
+    }
 
     List<ChatRoom> rooms;
 
-    if (studentIdHex != null) {
-      ObjectId sid = new ObjectId(studentIdHex);
-      rooms = roomRepo.findByStudentId(sid);
-    } else if (mentorIdHex != null) {
-      ObjectId mid = new ObjectId(mentorIdHex);
-      rooms = roomRepo.findByMentorId(mid);
+    if (studentId != null) {
+      ObjectId studentObjectId = new ObjectId(studentId);
+      if (!studentRepository.existsById(studentObjectId)) {
+        throw new NotFoundException("Student not found.");
+      }
+      rooms = chatRoomRepository.findByStudentId(studentObjectId);
+    } else if (mentorId != null) {
+      ObjectId mentorObjectId = new ObjectId(mentorId);
+      if (!mentorRepository.existsById(mentorObjectId)) {
+        throw new NotFoundException("Mentor not found.");
+      }
+      rooms = chatRoomRepository.findByMentorId(mentorObjectId);
     } else {
-      rooms = roomRepo.findAll();
+      rooms = chatRoomRepository.findAll();
     }
 
-    /* optional active / inactive filter */
-    rooms = rooms.stream()
-            .filter(r -> onlyActive == null || r.isActive() == onlyActive)
-            .toList();
-
-    if (rooms.isEmpty()) return List.of();
-
-    /* ---- batch-fetch mentors & students to avoid N+1 ---- */
-    Set<ObjectId> studentIds = rooms.stream()
-            .map(ChatRoom::getStudentId)
-            .collect(Collectors.toSet());
-    Set<ObjectId> mentorIds  = rooms.stream()
-            .map(ChatRoom::getMentorId)
-            .collect(Collectors.toSet());
-
-    Map<ObjectId, Student> studentMap = studentRepo.findAllById(studentIds)
-            .stream()
-            .collect(Collectors.toMap(Student::getId, Function.identity()));
-
-    Map<ObjectId, Mentor> mentorMap = mentorRepo.findAllById(mentorIds)
-            .stream()
-            .collect(Collectors.toMap(Mentor::getId, Function.identity()));
-
-    /* ---- map to DTOs ---- */
     return rooms.stream()
-            .map(r -> {
-              Student s = studentMap.get(r.getStudentId());   // may be null if deleted
-              Mentor  m = mentorMap.get(r.getMentorId());
-
-              String studentName = s != null ? s.getFullName() : "(student)";
-              String mentorName  = m != null ? m.getFullName() : "(mentor)";
-
-              return toDto(r, studentName, mentorName);
-            })
-            .toList();
+      .filter(room -> onlyActive == null || room.isActive() == onlyActive)
+      .map(this::toChatRoomResponse)
+      .toList();
   }
 
-  /* ──────────────── Helpers / mappers ──────────────────── */
-
-  private ChatRoomAdminDTO toDto(ChatRoom room,
-                                 Student student,
-                                 Mentor mentor) {
-
-    return new ChatRoomAdminDTO(
-            room.getId().toHexString(),
-            student.getId().toHexString(),
-            mentor.getId().toHexString(),
-            mentor.getFullName(),
-            student.getFullName(),
-            room.isActive(),
-            room.getCreatedAt()
-    );
+  public AdminChatRoomResponse getRoomDetails(ObjectId chatRoomId) {
+    ChatRoom room = chatRoomRepository.findById(chatRoomId)
+      .orElseThrow(() -> new NotFoundException("Chat room not found"));
+    return toChatRoomResponse(room);
   }
 
-  private ChatRoomAdminDTO toDto(ChatRoom room,
-                                 String studentFullName,
-                                 String mentorFullName) {
+  public AdminChatRoomResponse createChatRoom(CreateChatRoomRequest request) {
+    ObjectId studentId = new ObjectId(request.studentId());
+    ObjectId mentorId = new ObjectId(request.mentorId());
 
-    return new ChatRoomAdminDTO(
-            room.getId().toHexString(),
-            room.getStudentId().toHexString(),
-            room.getMentorId().toHexString(),
-            mentorFullName,
-            studentFullName,
-            room.isActive(),
-            room.getCreatedAt()
+    Student student = studentRepository.findById(studentId)
+      .orElseThrow(() -> new BadRequestException("Student not found"));
+    Mentor mentor = mentorRepository.findById(mentorId)
+      .orElseThrow(() -> new BadRequestException("Mentor not found"));
+
+    if (!mentorId.equals(student.getAssignedMentor())) {
+      throw new BadRequestException("Mentor is not assigned to this student");
+    }
+
+    chatRoomRepository.findByStudentIdAndMentorId(studentId, mentorId).ifPresent(existing -> {
+      if (existing.isActive()) {
+        throw new ConflictException("Chat room already exists between this student and mentor");
+      } else {
+        throw new ConflictException("Chat room exists but is inactive. Consider reactivating it.");
+      }
+    });
+
+    ChatRoom newRoom = new ChatRoom();
+    newRoom.setStudentId(studentId);
+    newRoom.setMentorId(mentorId);
+    newRoom.setActive(true);
+    newRoom.setCreatedAt(Instant.now());
+
+    return toChatRoomResponse(chatRoomRepository.save(newRoom));
+  }
+
+  public void updateChatRoomStatus(ObjectId chatRoomId, boolean active) {
+    ChatRoom room = chatRoomRepository.findById(chatRoomId)
+      .orElseThrow(() -> new NotFoundException("Chat room not found"));
+    room.setActive(active);
+    chatRoomRepository.save(room);
+  }
+
+  private AdminChatRoomResponse toChatRoomResponse(ChatRoom room) {
+    String studentName = studentRepository.findById(room.getStudentId())
+      .map(Student::getFullName)
+      .orElse("Unknown Student");
+
+    String mentorName = mentorRepository.findById(room.getMentorId())
+      .map(Mentor::getFullName)
+      .orElse("Unknown Mentor");
+
+    return new AdminChatRoomResponse(
+      room.getId().toHexString(),
+      studentName,
+      mentorName,
+      room.isActive(),
+      room.getCreatedAt()
     );
   }
 }

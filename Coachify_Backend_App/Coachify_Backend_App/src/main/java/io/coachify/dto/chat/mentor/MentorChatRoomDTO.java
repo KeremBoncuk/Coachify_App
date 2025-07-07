@@ -1,14 +1,13 @@
-// MentorChatRoomDTO.java
-package io.coachify.dto.chat;
+// src/main/java/io/coachify/dto/chat/mentor/MentorChatRoomDTO.java
+package io.coachify.dto.chat.mentor;
 
 import java.time.Instant;
 
-/** Row item shown in Mentor UI (needs student’s name). */
 public record MentorChatRoomDTO(
   String id,
   String studentId,
   String mentorId,
-  String studentFullName,
+  String studentFullName,  // ← ADD THIS
   Instant createdAt,
   boolean isActive
 ) {}

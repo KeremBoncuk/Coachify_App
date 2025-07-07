@@ -1,12 +1,16 @@
 package io.coachify.controller.chat;
 
-import io.coachify.dto.chat.ChatRoomAdminDTO;
+import io.coachify.dto.chat.admin.AdminChatRoomResponse;
+import io.coachify.dto.chat.admin.CreateChatRoomRequest;
+import io.coachify.dto.chat.admin.UpdateChatRoomRequest;
 import io.coachify.service.chat.ChatRoomAdminService;
 import lombok.RequiredArgsConstructor;
+import org.bson.types.ObjectId;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
@@ -15,29 +19,52 @@ import java.util.List;
 @PreAuthorize("hasRole('ADMIN')")
 public class ChatRoomAdminController {
 
-  private final ChatRoomAdminService service;
+  private final ChatRoomAdminService chatRoomService;
 
-  /* CREATE */
-  @PostMapping("/room")
+  /**
+   * GET /admin/chat/get-chatrooms
+   * Get all chat rooms with optional filters:
+   * - onlyActive (true/false)
+   * - mentorId or studentId (but not both)
+   */
+  @GetMapping("/get-chatrooms")
+  public List<AdminChatRoomResponse> getChatRooms(
+    @RequestParam(required = false) Boolean onlyActive,
+    @RequestParam(required = false) String studentId,
+    @RequestParam(required = false) String mentorId
+  ) {
+    return chatRoomService.getChatRooms(onlyActive, studentId, mentorId);
+  }
+
+  /**
+   * GET /admin/chat/get-room-details?chatRoomId=...
+   * Get metadata for a specific chat room.
+   */
+  @GetMapping("/get-room-details")
+  public AdminChatRoomResponse getRoomDetails(@RequestParam String chatRoomId) {
+    return chatRoomService.getRoomDetails(new ObjectId(chatRoomId));
+  }
+
+  /**
+   * POST /admin/chat/create-chatroom
+   * Create a new chat room between a student and mentor.
+   */
+  @PostMapping("/create-chatroom")
   @ResponseStatus(HttpStatus.CREATED)
-  public ChatRoomAdminDTO create(@RequestParam String studentId,
-                                 @RequestParam String mentorId) {
-    return service.createRoom(studentId, mentorId);
+  public AdminChatRoomResponse createChatRoom(@RequestBody @Valid CreateChatRoomRequest request) {
+    return chatRoomService.createChatRoom(request);
   }
 
-  /* ACTIVATE / DEACTIVATE – query-param style */
-  @PutMapping("/room")
+  /**
+   * PUT /admin/chat/update-chatroom?chatRoomId=...
+   * Activate or deactivate a chat room.
+   */
+  @PutMapping("/update-chatroom")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void update(@RequestParam String roomId,
-                     @RequestParam boolean active) {
-    service.setActive(roomId, active);
-  }
-
-  /* LIST / FILTER */
-  @GetMapping("/rooms")
-  public List<ChatRoomAdminDTO> list(@RequestParam(required = false) Boolean onlyActive,
-                                     @RequestParam(required = false) String studentId,
-                                     @RequestParam(required = false) String mentorId) {
-    return service.list(onlyActive, studentId, mentorId);
+  public void updateChatRoomStatus(
+    @RequestParam String chatRoomId,
+    @RequestBody @Valid UpdateChatRoomRequest request
+  ) {
+    chatRoomService.updateChatRoomStatus(new ObjectId(chatRoomId), request.active());
   }
 }

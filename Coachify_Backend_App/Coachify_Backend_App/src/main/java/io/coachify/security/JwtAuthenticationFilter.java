@@ -23,12 +23,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final JwtService jwtService;
 
-  @Override
-  protected boolean shouldNotFilter(HttpServletRequest request) {
-    String path = request.getServletPath();
-    // ✅ Only skip JWT validation for login, not logout
-    return path.equals("/auth/login");
-  }
+  
 
   @Override
   protected void doFilterInternal(HttpServletRequest request,

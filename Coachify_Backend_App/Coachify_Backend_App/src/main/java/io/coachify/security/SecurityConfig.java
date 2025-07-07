@@ -26,13 +26,13 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     return http
-      .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+      .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ✅ Enable CORS
       .csrf(csrf -> csrf.disable())
       .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
       .authorizeHttpRequests(auth -> auth
         .requestMatchers("/auth/login").permitAll()
-        .requestMatchers("/auth/logout", "/auth/validate-token").authenticated()
-        .requestMatchers("/ws/**").permitAll()          // WebSocket handshake
+        .requestMatchers("auth/logout", "auth/validate-token").authenticated()
+        .requestMatchers("/ws/**").permitAll() // Allow WebSocket connections
         .requestMatchers("/student/**").hasRole("STUDENT")
         .requestMatchers("/mentor/**").hasRole("MENTOR")
         .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -42,14 +42,16 @@ public class SecurityConfig {
       .build();
   }
 
-  /* CORS for local React dev; make configurable for prod */
+  // ✅ CORS configuration for localhost:3000 (React frontend)
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration config = new CorsConfiguration();
+    // TODO: For production, replace "http://localhost:3000" with your actual frontend domain(s).
+    // Example: config.setAllowedOrigins(List.of("https://your-production-domain.com"));
     config.setAllowedOrigins(List.of("http://localhost:3000"));
     config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("*"));
-    config.setAllowCredentials(true);
+    config.setAllowedHeaders(List.of("*")); // Accept all headers
+    config.setAllowCredentials(true); // Needed if frontend ever uses cookies or credentials
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", config);

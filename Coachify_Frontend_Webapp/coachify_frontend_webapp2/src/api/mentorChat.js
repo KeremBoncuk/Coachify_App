@@ -1,17 +1,28 @@
 import axios from "./axiosInstance";
 
-/* ───────────── Rooms (active only) ───────────── */
-/* GET /mentor/chat/rooms                          */
+/* ───────────── Rooms ───────────── */
+
 export const getActiveChatRooms = () =>
   axios.get("/mentor/chat/rooms");
 
-/* ───────────── Message history (paged) ────────── */
-/* GET /chat/history?roomId=&before=&limit=        */
+/* ───────────── Messages (paginated) ───────────── */
+
 export const getPaginatedMessages = (
   chatRoomId,
   before = null,
-  limit  = 20
+  limit = 20
 ) =>
-  axios.get("/chat/history", {
-    params: { roomId: chatRoomId, before, limit },
+  axios.get("/mentor/chat/messages", {
+    params: { chatRoomId, before, limit },
   });
+
+
+
+/* ───────────── Mark as seen ───────────── */
+
+export const markMessagesAsSeen = (chatRoomId, seenUntilIso) =>
+  axios.post(
+    "/mentor/chat/messages/seen",
+    null,
+    { params: { chatRoomId, seenUntil: seenUntilIso } }
+  );
