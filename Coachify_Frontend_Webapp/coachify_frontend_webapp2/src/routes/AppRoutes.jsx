@@ -12,7 +12,8 @@ import ChatMonitorPage from "../pages/admin/chat/ChatMonitorPage";
 
 /* Mentor pages */
 import MentorDashboard from "../pages/mentor/Dashboard";
-import MentorChatPage from "../pages/mentor/chat/MentorChatPage";   // ← NEW
+import MentorChatPage from "../pages/mentor/chat/MentorChatPage";
+import MentorStudentPage from "../pages/mentor/students/MentorStudentPage";  // ✅ NEW
 
 const AppRoutes = () => (
   <Routes>
@@ -33,7 +34,8 @@ const AppRoutes = () => (
     <Route element={<PrivateRoute allowedRoles={["MENTOR"]} />}>
       <Route element={<Layout />}>
         <Route path="/mentor/dashboard" element={<MentorDashboard />} />
-        <Route path="/mentor/chat" element={<MentorChatPage />} /> {/* NEW */}
+        <Route path="/mentor/chat" element={<MentorChatPage />} />
+        <Route path="/mentor/students" element={<MentorStudentPage />} /> {/* ✅ NEW */}
       </Route>
     </Route>
 

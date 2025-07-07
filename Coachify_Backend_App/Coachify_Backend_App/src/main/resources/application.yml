@@ -15,5 +15,5 @@ jwt.secret: 3Y7+F4VxUgPQpPjvcnNCM0QpZqozJfsGbA8v9LtIc5o=  #this will be hid once
 encryption:
   secret-key: 3ZP3zWkNcUoYm8qAa/N0cMiSc77T/qpIlcQ8AXKh3CI=
 
-
-
+server:
+  address: 0.0.0.0  #  Binds server to all network interfaces (LAN access enabled)
